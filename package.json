@@ -19,5 +19,8 @@
   "workspaces": [
     "apps/*",
     "libs/*"
-  ]
+  ],
+  "dependencies": {
+    "config": "^4.0.0"
+  }
 }

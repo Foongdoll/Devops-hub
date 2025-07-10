@@ -23,7 +23,7 @@ export class AuthController {
     return this.authService.login(loginDto);
   }
 
-  @Post('register')
+  @Post('join')
   @ApiOperation({ summary: '회원가입', description: '사용자 회원가입 API', parameters: [] })
   register(@Body() registerDto: RegisterDto): Promise<ApiResponse> {
     return this.authService.register(registerDto);

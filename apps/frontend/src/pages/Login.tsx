@@ -1,59 +1,67 @@
-import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useLogin } from '../customhook/useLogin';
 
-const Login: React.FC = () => {
-  const [userId, setUserId] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    try {
-      // const response = await axios.post('/api/auth/login', {
-      //   userId,
-      //   password,
-      // });
-
-      // const { token } = response.data;
-      // localStorage.setItem('jwt', token); // JWT 저장
-      // window.location.href = '/'; // 로그인 후 메인으로 이동
-    } catch (err: any) {
-      setError(err.response?.data?.message || '로그인 실패');
-    }
-  };
+const Login = () => {
+  const navigate = useNavigate();
+  const {
+    userId, setUserId,
+    userPw, setUserPw,
+    handleLogin
+  } = useLogin({ navigate });
 
   return (
-    <div className="flex h-screen items-center justify-center bg-gray-100">
-      <form onSubmit={handleLogin} className="bg-white p-6 rounded shadow-md w-80">
-        <h2 className="text-xl font-bold mb-4">로그인</h2>
-
-        <input
-          type="text"
-          placeholder="아이디"
-          value={userId}
-          onChange={(e) => setUserId(e.target.value)}
-          className="w-full mb-3 p-2 border border-gray-300 rounded"
-          required
-        />
-
-        <input
-          type="password"
-          placeholder="비밀번호"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="w-full mb-4 p-2 border border-gray-300 rounded"
-          required
-        />
-
-        {error && <div className="text-red-500 text-sm mb-2">{error}</div>}
-
-        <button
-          type="submit"
-          className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition"
-        >
-          로그인
-        </button>
-      </form>
+    <div className="min-h-screen flex flex-col justify-center items-center bg-gradient-to-tr from-[#e8defa] to-[#b3c1f7]">
+      <div className="w-[370px] bg-white rounded-2xl shadow-2xl p-10 flex flex-col items-center">
+        {/* 로고 */}
+        <div className="mb-4">
+          <img src="/logo192.png" alt="logo" className="w-16 h-16 rounded-full shadow-lg" />
+        </div>
+        {/* 환영 메시지 */}
+        <div className="text-2xl font-bold text-[#6f52e4] mb-2">DevOps Hub</div>
+        <div className="text-gray-500 mb-8 text-sm text-center">
+          안녕하세요! <br />DevOps Hub에 로그인해주세요.
+        </div>
+        {/* 폼 */}
+        <form className="w-full" onSubmit={handleLogin} autoComplete="off">
+          <input
+            type="text"
+            placeholder="아이디"
+            className="w-full mb-3 px-4 py-2 rounded bg-gray-100 border focus:outline-none focus:ring-2 focus:ring-[#7e4cff] transition"
+            value={userId}
+            onChange={e => setUserId(e.target.value)}
+            required
+            autoFocus
+          />
+          <input
+            type="password"
+            placeholder="비밀번호"
+            className="w-full mb-5 px-4 py-2 rounded bg-gray-100 border focus:outline-none focus:ring-2 focus:ring-[#7e4cff] transition"
+            value={userPw}
+            onChange={e => setUserPw(e.target.value)}
+            required
+            autoComplete="current-password"
+          />
+          <button
+            type="submit"
+            // loading은 전역(GlobalUI)에서 관리, 버튼은 전역 컨텍스트에서 disabled 제어
+            className="w-full bg-gradient-to-r from-[#7e4cff] to-[#6e70f2] text-white font-bold py-2 rounded-xl shadow-lg hover:from-[#8b5cf6] hover:to-[#7e4cff] transition"
+          >
+            로그인
+          </button>
+        </form>
+        {/* 하단 링크 */}
+        <div className="mt-8 text-xs text-gray-400">
+          계정이 없으신가요?{" "}
+          <button
+            type="button"
+            className="text-[#7e4cff] underline focus:outline-none"
+            onClick={() => navigate("/join")}
+            tabIndex={0}
+          >
+            회원가입
+          </button>
+        </div>
+      </div>
     </div>
   );
 };
