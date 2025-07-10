@@ -1,12 +1,25 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { AuthModule } from './auth/auth.module';
+import { GlobalConfigModule } from './global/global-config.module';
+import { APP_FILTER } from '@nestjs/core';
+import { AllExceptionsFilter } from './common/filters/http-exception.filter';
+import { User } from './auth/entities/auth-user.entity';
+import { Role } from './auth/entities/auth-role.entity';
+import { RefreshToken } from './auth/entities/auth-refresh-token.entity';
+import { ThrottlerModule } from '@nestjs/throttler';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true, // 어디서든 process.env 사용 가능
+
     }),
+    ThrottlerModule.forRoot([{
+      ttl: 60000,      // 1분
+      limit: 30,    // 분당 30회까지
+    }]),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -19,10 +32,18 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
         database: config.get('DB_DATABASE'),
         autoLoadEntities: true,
         synchronize: true, // 실서비스에서는 false로!
+        entities: [__dirname + '/**/*.entity{.ts,.js}'],
       }),
     }),
+    GlobalConfigModule,
+    AuthModule
   ],
   controllers: [],
-  providers: [],
+  providers: [
+    {
+      provide: APP_FILTER,
+      useClass: AllExceptionsFilter,
+    }
+  ],
 })
-export class AppModule {}
+export class AppModule { }
