@@ -1,37 +1,41 @@
-import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
 import Login from './pages/Login';
-import DashboardLayout from './layout/DashboardLayout.tsx';
+import Join from './pages/Join';
+import DashboardLayout from './layout/DashboardLayout';
 import Dashboard from './pages/Dashboard';
-import Join from './pages/Join.tsx';
+import Terminals from './pages/Terminals';
 
 const RequireAuth = ({ children }: { children: React.ReactNode }) => {
-  // 토큰 기반 로그인 여부 체크
-  const isAuthed = !!localStorage.getItem('accessToken');
+  const isAuthed = React.useMemo(() => !!localStorage.getItem('accessToken'), []);
   return isAuthed ? <>{children}</> : <Navigate to="/login" />;
 };
 
 const App = () => (
-  <BrowserRouter>    
-      <Routes>
-        {/* 로그인 전용 경로 */}
-        <Route path="/login" element={<Login />} />
-        <Route path='/join' element={<Join />} />
-        {/* 로그인 이후 레이아웃(사이드바/탑바/메인) */}
-        <Route
-          path="/*"
-          element={
-            <RequireAuth>
-              <DashboardLayout>
-                <Outlet />
-              </DashboardLayout>
-            </RequireAuth>
-          }
-        >
-          {/* 메인 대시보드 */}
-          <Route index element={<Dashboard />} />                   
-        </Route>
-      </Routes>    
+  
+
+  <BrowserRouter>
+    <Routes>
+      <Route path="/login" element={<Login />} />
+      <Route path="/join"  element={<Join  />} />
+
+      {/* 이 라우트 하나로 대시보드 관련 모든 경로를 감쌉니다 */}
+      <Route
+        path="/*"
+        element={
+          <RequireAuth>
+            <DashboardLayout />
+          </RequireAuth>
+        }
+      >
+        {/* 이 두 개만 이 아래에 둡니다 */}
+        <Route index        element={<Dashboard />} />
+        <Route path="terminals" element={<Terminals />} />
+
+        {/* 추가로 /settings, /git 등도 이 아래에 계속 추가 */}
+      </Route>
+    </Routes>
   </BrowserRouter>
 );
 

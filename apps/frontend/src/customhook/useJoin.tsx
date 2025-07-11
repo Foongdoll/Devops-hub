@@ -5,7 +5,7 @@ import { useGlobalUI } from "../context/GlobalUIContext";
 import { useNotify } from "../context/GlobalNotifyContext";
 
 export const useJoin = ({ navigate }: { navigate: NavigateFunction }) => {
-  const { setLoading, setError } = useGlobalUI();
+  const { setLoading } = useGlobalUI();
   const { showToast } = useNotify();
   const [userId, setUserId] = useState("");
   const [userPw, setUserPw] = useState("");
@@ -17,19 +17,18 @@ export const useJoin = ({ navigate }: { navigate: NavigateFunction }) => {
       showToast("모든 필드를 입력해주세요.", "error");
       return;
     }
-    setLoading(true);        
-    
-    const success = await AuthService.join(userId, userPw, userName);
-    if (success) {
-      showToast("회원가입이 완료되었습니다.", "success");
-      navigate("/login");
-    } else {
-      setError("회원가입에 실패했습니다. 다시 시도해주세요.");
-      showToast("회원가입에 실패했습니다.", "error");
-    }
-    setTimeout(() => {
+    setLoading(true);
+
+    try {
+      const res = await AuthService.join(userId, userPw, userName);
+      
+      if (res) {
+        showToast("회원가입이 완료되었습니다.", "success");
+        navigate("/login");
+      } 
+    } finally {
       setLoading(false);
-    }, 2000);
+    }
   };
 
   return {

@@ -19,7 +19,7 @@ const Join = () => {
           </button>
         </form>
         <div className="mt-8 text-xs text-gray-400">
-          이미 계정이 있으신가요? <button className="text-[#7e4cff] underline" onClick={() => navigate("/login")}>로그인</button>
+          이미 계정이 있으신가요? <button className="text-[#7e4cff] underline hover:text-[#6e70f2] transition cursor-pointer" onClick={() => navigate("/login")}>로그인</button>
         </div>
       </div>
     </div>

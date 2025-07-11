@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState } from 'react';
+import type { ReactNode } from 'react';
 
 type NotifyType = 'info' | 'success' | 'error' | 'warn' | 'confirm';
 type ToastData = { message: string; type: NotifyType; id?: number };

@@ -54,7 +54,7 @@ const Login = () => {
           계정이 없으신가요?{" "}
           <button
             type="button"
-            className="text-[#7e4cff] underline focus:outline-none"
+            className="text-[#7e4cff] underline focus:outline-none hover:text-[#6e70f2] transition cursor-pointer"
             onClick={() => navigate("/join")}
             tabIndex={0}
           >

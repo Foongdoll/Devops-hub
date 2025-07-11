@@ -4,9 +4,11 @@ import {
   ExceptionFilter,
   HttpException,
   HttpStatus,
+  Logger,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { ApiResponse } from '../dto/response.dto';
+import { createLogger } from '../Log/logger.service';
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
@@ -24,16 +26,23 @@ export class AllExceptionsFilter implements ExceptionFilter {
       exception instanceof HttpException
         ? String(exception.getResponse())
         : 'Internal server error';
-    
+
+    Logger.log(createLogger({
+      message: '예외 발생 - ' + status + ' ' + message + ' - ' + (exception instanceof Error ? exception.stack : ''),
+      level: 'error',
+      path: req.url,
+      timestamp: new Date(),
+    }));
+
     res.status(status).send(
-        ApiResponse.error(
-            message,
-            { 
-                statusCode: status,
-                timestamp: new Date().toISOString(), 
-                path: req.url 
-            }
-        )
+      ApiResponse.error(
+        message,
+        {
+          statusCode: status,
+          timestamp: new Date().toISOString(),
+          path: req.url
+        }
+      )
     )
   }
 }

@@ -6,7 +6,7 @@ export class RefreshToken {
     @PrimaryGeneratedColumn("uuid")
     refreshTokenCd: string;
 
-    @Column({ nullable: true })    
+    @Column({ nullable: true, type: 'varchar', length: 500, default: '' })
     refreshToken: string;
 
     @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })

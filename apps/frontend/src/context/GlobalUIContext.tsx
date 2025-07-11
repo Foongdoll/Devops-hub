@@ -35,8 +35,7 @@ export function GlobalUIProvider({ children }: { children: ReactNode }) {
           {error}
           <button className="ml-3 underline" onClick={() => setError(null)}>닫기</button>
         </div>
-      )}
-      {children}
+      )}      
     </GlobalUIContext.Provider>
   );
 }

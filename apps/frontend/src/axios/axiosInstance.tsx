@@ -1,7 +1,7 @@
 import axios, { AxiosError } from 'axios';
 import type { AxiosResponse } from 'axios';
-import { showToast } from '../uills/notify';
-import type { ApiRequestOptions, ApiResponse, ApiError } from '../interface/axiosInterface';
+import { showToast } from '../utils/notifyStore';
+import type { ApiRequestOptions, ApiResponse, ApiError } from '../interface/AxiosInterface';
 
 // env 인식 못함 npm 설치 필요~ 산책 다녀와서 할 것 !!
 const axiosInstance = axios.create({
@@ -23,6 +23,9 @@ axiosInstance.interceptors.request.use(
 axiosInstance.interceptors.response.use(
   (res: AxiosResponse) => {
     const { message, type } = res.data || {};
+
+    console.log('응답 데이터:', res);
+
     // 성공 메시지 있으면 토스트로!
     if (message) showToast(message, type || 'success');
     return res.data;

@@ -13,7 +13,6 @@ import { Roles } from 'src/common/decorator/rols.decorator';
 @ApiTags('Auth')
 @ApiBearerAuth()
 @Controller('auth')
-@UseGuards(JwtAuthGuard, RoleGuard) 
 export class AuthController {
   constructor(private readonly authService: AuthService) { }
 
@@ -29,6 +28,7 @@ export class AuthController {
     return this.authService.register(registerDto);
   }
 
+  @UseGuards(JwtAuthGuard, RoleGuard) 
   @Roles('USER')
   @Post('refresh')
   @ApiOperation({ summary: '토큰 재발급', description: '사용자 토큰 재발급 API' })

@@ -17,11 +17,17 @@ export class User {
     @Column()
     userName: string;
 
+    @Column({ nullable: true})
+    refreshTokenCd: string;
+
+    @Column()
+    roleCd: string;
+
     @JoinColumn({ name: "roleCd" })
-    @ManyToOne( () => Role, { eager: true })
+    @ManyToOne(() => Role, { eager: true })
     role: Role;
-    
-    @JoinColumn({ name: "refreshTokenCd" })
-    @ManyToOne( () => RefreshToken, { eager: true })
-    refreshToken: RefreshToken;    
+
+    @ManyToOne(() => RefreshToken, { eager: true, nullable: true })
+    @JoinColumn({ name: "refreshTokenCd" }) 
+    refreshToken: RefreshToken;
 }
