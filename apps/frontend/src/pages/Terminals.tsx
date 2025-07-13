@@ -1,42 +1,41 @@
 import { useState } from 'react';
 import { Server, PlusCircle, Trash2, Link2, Terminal as TerminalIcon } from 'lucide-react';
 import NewSessionModal from '../components/NewSessionModal';
+import { useTerminals } from '../customhook/useTerminals';
+import type { Session } from '../services/TerminalService';
 
-type SessionType = 'SSH' | 'FTP' | 'SFTP';
-interface Session {
-  id: number;
-  label: string;
-  type: SessionType;
-  host: string;
-  port: number;
-  username: string;
-  status: 'connected' | 'idle';
-}
 
 export default function Terminals() {
-  // 모킹 세션 데이터
-  const [sessions, setSessions] = useState<Session[]>([
-    { id: 1, label: 'Dev 서버 SSH',   type: 'SSH',  host: 'dev.example.com',    port: 22,   username: 'ubuntu', status: 'connected' },
-    { id: 2, label: '파일서버 SFTP', type: 'SFTP', host: 'files.example.com',  port: 22,   username: 'root',   status: 'idle' },
-    { id: 3, label: '외부 FTP',      type: 'FTP',  host: 'ftp.backup.co.kr',  port: 21,   username: 'ftpuser',status: 'idle' },
-  ]);
-  const [selectedId, setSelectedId] = useState<number>(sessions[0].id);
+  const {
+    sessions,
+    selectedId,
+    setSelectedId,
+    output,
+    error,
+    create,
+    remove,
+    send,
+    setSessions
+  } = useTerminals();
+  
   const [isModalOpen, setModalOpen] = useState(false);
 
   const active = sessions.find(s => s.id === selectedId);
 
   const handleCreate = async (data: Omit<Session, 'id' | 'status'>) => {
-    // TODO: service 호출해서 백엔드에 저장
+    
     const newSession: Session = {
-      id: Date.now(),
+      id: crypto.randomUUID(),
       ...data,
       status: 'idle'
     };
+    
+    await create(newSession);
     setSessions(prev => [...prev, newSession]);
     setSelectedId(newSession.id);
   };
 
-  const handleDelete = (id: number) => {
+  const handleDelete = (id: string) => {
     setSessions(prev => prev.filter(s => s.id !== id));
     if (id === selectedId && sessions.length > 1) {
       const next = sessions.find(s => s.id !== id)!;

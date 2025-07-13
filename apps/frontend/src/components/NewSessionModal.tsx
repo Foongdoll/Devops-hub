@@ -2,6 +2,7 @@ import { Fragment, useState } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 
 type SessionType = 'SSH' | 'FTP' | 'SFTP';
+type PlatformType = 'AWS' | 'Oracle' | 'Azure' | 'GCP' | 'Local' | 'Other';
 
 interface NewSessionModalProps {
     isOpen: boolean;
@@ -9,6 +10,7 @@ interface NewSessionModalProps {
     onCreate: (data: {
         label: string;
         type: SessionType;
+        platform: PlatformType;
         host: string;
         port: number;
         username: string;
@@ -21,6 +23,7 @@ interface NewSessionModalProps {
 export default function NewSessionModal({ isOpen, onClose, onCreate }: NewSessionModalProps) {
     const [label, setLabel] = useState('');
     const [type, setType] = useState<SessionType>('SSH');
+    const [platform, setPlatform] = useState<PlatformType>('Local');
     const [host, setHost] = useState('');
     const [port, setPort] = useState(22);
     const [username, setUsername] = useState('');
@@ -31,7 +34,7 @@ export default function NewSessionModal({ isOpen, onClose, onCreate }: NewSessio
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        await onCreate({ label, type, host, port, username, authMethod, password, privateKey });
+        await onCreate({ label, type, platform, host, port, username, authMethod, password, privateKey });
         onClose();
     };
 
@@ -99,6 +102,36 @@ export default function NewSessionModal({ isOpen, onClose, onCreate }: NewSessio
                                             onChange={e => setLabel(e.target.value)}
                                             required
                                         />
+                                    </div>
+
+                                    {/* 플랫폼 선택 */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            플랫폼
+                                        </label>
+                                        <div className="grid grid-cols-3 gap-2">
+                                            {([
+                                                { name: 'AWS', icon: '☁️', color: 'orange' },
+                                                { name: 'Oracle', icon: '🔶', color: 'red' },
+                                                { name: 'Azure', icon: '🔷', color: 'blue' },
+                                                { name: 'GCP', icon: '🌐', color: 'green' },
+                                                { name: 'Local', icon: '💻', color: 'gray' },
+                                                { name: 'Other', icon: '⚙️', color: 'gray' },
+                                            ] as const).map((platformItem) => (
+                                                <button
+                                                    key={platformItem.name}
+                                                    type="button"
+                                                    className={`py-2.5 px-3 rounded-lg border-2 transition-all text-sm flex items-center justify-center gap-1 ${platform === platformItem.name
+                                                        ? 'border-purple-500 bg-purple-50 text-purple-700'
+                                                        : 'border-gray-200 hover:border-gray-300'
+                                                        }`}
+                                                    onClick={() => setPlatform(platformItem.name as PlatformType)}
+                                                >
+                                                    <span className="text-base">{platformItem.icon}</span>
+                                                    <span>{platformItem.name}</span>
+                                                </button>
+                                            ))}
+                                        </div>
                                     </div>
 
                                     {/* 연결 타입 */}

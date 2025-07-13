@@ -10,7 +10,7 @@ export function useLogin({ navigate }: { navigate: NavigateFunction }) {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    // setLoading(true);
     setError(null);
     try {
       const res = await AuthService.login(userId, userPw);      
@@ -18,9 +18,9 @@ export function useLogin({ navigate }: { navigate: NavigateFunction }) {
         localStorage.setItem('accessToken', res.accessToken);
         setLoading(false);
         navigate("/"); // 로그인 성공 시 홈으로 이동        
-      }    
+      }
     } finally {
-      setLoading(false);
+      // setLoading(false);
     }
   };
 

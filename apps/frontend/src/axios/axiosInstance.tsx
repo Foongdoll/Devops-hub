@@ -27,7 +27,9 @@ axiosInstance.interceptors.response.use(
     console.log('응답 데이터:', res);
 
     // 성공 메시지 있으면 토스트로!
-    if (message) showToast(message, type || 'success');
+    if (message) {
+      showToast(message, type || 'success');
+    }
     return res.data;
   },
   (err: AxiosError<any>) => {

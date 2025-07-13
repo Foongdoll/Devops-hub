@@ -9,6 +9,7 @@ import { User } from './auth/entities/auth-user.entity';
 import { Role } from './auth/entities/auth-role.entity';
 import { RefreshToken } from './auth/entities/auth-refresh-token.entity';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { TerminalModule } from './terminal/terminal.module';
 
 @Module({
   imports: [
@@ -36,7 +37,8 @@ import { ThrottlerModule } from '@nestjs/throttler';
       }),
     }),
     GlobalConfigModule,
-    AuthModule
+    AuthModule,
+    TerminalModule
   ],
   controllers: [],
   providers: [

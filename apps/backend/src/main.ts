@@ -5,18 +5,27 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { WinstonModule } from 'nest-winston';
 import { winstonConfig } from './common/Log/logger.config';
+import { IoAdapter } from '@nestjs/platform-socket.io';
+import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule,{
+  const app = await NestFactory.create(AppModule, {
     logger: WinstonModule.createLogger(winstonConfig),
-  });
+  });  
+
   app.use(helmet());
   app.enableCors({
-    origin: process.env.CORS_ORIGIN || '*',
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+    origin: [
+      'http://13.124.87.223',     // 배포 주소
+      'http://localhost:5173',    // 개발 주소
+      'file://',                   // Electron 파일 프로토콜
+      'app://',                    // Electron 앱 프로토콜
+      /^capacitor:\/\/localhost/, // Capacitor (모바일)
+      /^ionic:\/\/localhost/,     // Ionic
+    ],
     credentials: true,
-    allowedHeaders: 'Content-Type, Authorization',
-
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
   });
 
   app.useGlobalPipes(new ValidationPipe({
@@ -25,6 +34,7 @@ async function bootstrap() {
     transform: true,
   }));
 
+  app.useGlobalFilters(new AllExceptionsFilter);
   await swagger(app);
   await app.listen(process.env.PORT ?? 3000);
 }
