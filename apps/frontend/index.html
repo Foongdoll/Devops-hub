@@ -1,13 +1,51 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Devops-hub</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Devops-hub</title>
+  <style>
+    /* 트리·사이드바·패널 공통 스크롤바 */
+    ::-webkit-scrollbar {
+      width: 9px;
+      background: #23223b;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: #23223b;
+      border-radius: 5px;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: linear-gradient(120deg, #7b85ff99 0%, #b1bbffbb 100%);
+      border-radius: 7px;
+      border: 2.5px solid #23223b;
+      min-height: 32px;
+      transition: background 0.2s;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: linear-gradient(110deg, #a7b6ff 0%, #7b85ff 100%);
+    }
+
+    html {
+      scrollbar-width: thin;
+      scrollbar-color: #9fa9fd #23223b;
+    }
+
+    body {
+      scrollbar-face-color: #8b9cff;
+      scrollbar-track-color: #23223b;
+    }
+  </style>
+
+</head>
+
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.tsx"></script>
+</body>
+
 </html>
