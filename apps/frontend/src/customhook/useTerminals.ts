@@ -20,17 +20,6 @@ export function useTerminals() {
   const inputBufferRef = useRef<string>('');
   const lastOutputRef = useRef<string>('');
 
-  const [cwd, setCwd] = useState<string>('/');        // ① cwd 상태 추가
-  const { socket } = useSocket();                     // 소켓 컨텍스트
-
-  useEffect(() => {
-    if (!socket) return;
-    const onPwd = (path: string) => setCwd(path);
-    socket.on('sftp-pwd', onPwd);
-    return () => { socket.off('sftp-pwd', onPwd); };
-  }, [socket]);
-
-
   // 2. Xterm.js 인스턴스 생성 및 해제
   useEffect(() => {
     if (!selectedId || !terminalContainerRef.current) return;
@@ -48,6 +37,19 @@ export function useTerminals() {
     xtermRef.current = xterm;
     fitAddonRef.current = fit;
 
+    // 중요: 터미널이 DOM에 마운트된 후 fit() 호출
+    // requestAnimationFrame을 사용하여 DOM 업데이트 후 실행되도록 보장
+    requestAnimationFrame(() => {
+      fit.fit();
+    });
+
+    // 윈도우 크기 변경 시 터미널 크기 조정
+    const handleResize = () => {
+      fit.fit();
+    };
+    window.addEventListener('resize', handleResize);
+
+
     // 키 입력 이벤트
     xterm.onData(data => {
       send(data);
@@ -59,6 +61,7 @@ export function useTerminals() {
       fitAddonRef.current = null;
       lastOutputRef.current = '';
       inputBufferRef.current = '';
+      window.removeEventListener('resize', handleResize); // 이벤트 리스너 정리
     };
   }, [selectedId]);
 
@@ -175,6 +178,5 @@ export function useTerminals() {
     handleDelete,
     handleCreate,
     terminalContainerRef,
-    cwd
   };
 }

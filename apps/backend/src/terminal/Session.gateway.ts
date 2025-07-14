@@ -8,232 +8,249 @@ import {
   ConnectedSocket,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { ConnectConfig, SFTPWrapper, Client as SSHClient } from 'ssh2';
+import { ConnectConfig, Client as SSHClient } from 'ssh2';
 import { TerminalService } from './terminal.service';
 import { Logger } from '@nestjs/common';
-import { createLogger } from 'src/common/Log/logger.service';
-import SftpClient from 'ssh2-sftp-client'
-
+import SftpClient from 'ssh2-sftp-client';
+import { Buffer } from 'buffer';
 
 interface StartPayload { sessionId: string; }
 interface InputPayload { data: string; }
-// SFTP 업로드 페이로드 타입
+interface ListPayload { remotePath: string; }
+
 interface UploadPayload {
-  /** 원격에 업로드할 디렉터리 경로 (예: '/home/ubuntu') */
-  remotePath: string;
-  /** 업로드할 파일 이름 */
-  fileName: string;
-  /** FileReader로 읽은 base64 인코딩 문자열 */
-  data: string;
-}
-interface ListPayload {
-  remotePath: string;
-}
-// SFTP 다운로드 페이로드 타입
-interface DownloadPayload {
-  /** 다운로드할 원격 파일 전체 경로 (예: '/home/ubuntu/logs/app.log') */
-  remoteFile: string;
+  remotePath: string;  // 업로드할 디렉토리
+  fileName: string;    // 업로드 파일명
+  data: string;        // base64 인코딩된 파일
 }
 
 @WebSocketGateway({
   cors: {
-    // origin: 'http://13.124.87.223', // 배포 주소/
-    origin: 'http://localhost:5173', // 개발 주소/
+    origin: 'http://localhost:5173',
     credentials: true,
   },
 })
 export class SessionsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer() io: Server;
 
-  // 맵: socket.id → { ssh: SSHClient, stream: any }
-  private clients = new Map<string, { ssh: SSHClient; stream: any }>();
-  private sftpClients = new Map<string, SftpClient>();
+  private clients = new Map<string, { ssh: SSHClient; stream: any; sftp?: SftpClient }>();
   private readonly logger = new Logger(SessionsGateway.name);
+
   constructor(private readonly sessions: TerminalService) { }
 
-
   handleConnection(sock: Socket) {
-    // 연결 시 로그
-    Logger.log(createLogger({
-      message: '웹소켓 연결',
-      level: 'info',
-      path: '/terminal/connect',
-      timestamp: new Date(),
-    }));
+    this.logger.log(`WebSocket connected: ${sock.id}`);
   }
 
   handleDisconnect(sock: Socket) {
     const entry = this.clients.get(sock.id);
     if (entry) {
-      entry.stream.end();
-      entry.ssh.end();
+      entry.stream?.end();
+      entry.ssh?.end();
+      entry.sftp?.end();
       this.clients.delete(sock.id);
     }
-    Logger.log(createLogger({
-      message: '웹소켓 연결 해제 - ' + sock.id,
-      level: 'info',
-      path: '/terminal/disconnect',
-      timestamp: new Date(),
-    }));
+    this.logger.log(`WebSocket disconnected: ${sock.id}`);
   }
 
   @SubscribeMessage('start')
   async onStart(
-    @MessageBody() payload: StartPayload,
+    @MessageBody() { sessionId }: StartPayload,
     @ConnectedSocket() sock: Socket,
   ) {
-    // --- 1. Fetch session ---
-    const apiRes = await this.sessions.findOne(payload.sessionId);
+    const apiRes = await this.sessions.findOne(sessionId);
     const sess = apiRes.data;
     if (!sess) {
       sock.emit('error', 'Session not found');
       return;
     }
-    this.logger.log(`Session loaded: ${JSON.stringify(sess)}`);
 
-    // --- 2. Auto-select username by platform ---
+    // Determine username
     let username = sess.username?.trim();
     if (!username) {
       switch (sess.platform) {
-        case 'AWS':
-          username = 'ec2-user';
-          break;
-        case 'Oracle':
-          username = 'opc';
-          break;
-        case 'Azure':
-          username = 'azureuser';
-          break;
-        case 'GCP':
-          username = 'gcp-user';
-          break;
-        case 'Local':
-        case 'Other':
-        default:
-          username = sess.username?.trim() || 'root';
-          break;
+        case 'AWS': username = 'ec2-user'; break;
+        case 'Oracle': username = 'opc'; break;
+        case 'Azure': username = 'azureuser'; break;
+        case 'GCP': username = 'gcp-user'; break;
+        default: username = sess.username?.trim() || 'root';
       }
     }
 
-    // --- 3. Build SSH connect options ---
+    // SSH connect options
     const connectOpts: ConnectConfig = {
       host: sess.host,
       port: sess.port || 22,
       username,
       tryKeyboard: true,
       hostHash: 'sha256',
-      hostVerifier: (hashedKey: string) => {
-        this.logger.debug(`Host key fingerprint: ${hashedKey}`);
-        return true; // TODO: 지문 매칭 로직으로 강화
-      },
+      hostVerifier: () => true,
     };
 
-    // --- 4. Authentication ---
     if (sess.authMethod === 'key' && sess.privateKey) {
-      // DB에 PEM 키 내용 자체 저장
       connectOpts.privateKey = sess.privateKey;
     } else if (sess.password) {
       connectOpts.password = sess.password;
     }
 
-    this.logger.log(`Connecting with options: ${JSON.stringify({
-      host: connectOpts.host,
-      port: connectOpts.port,
-      username: connectOpts.username,
-      hasKey: !!connectOpts.privateKey,
-    })}`);
+    this.logger.log(`Connecting: ${JSON.stringify({ host: connectOpts.host, port: connectOpts.port, username })}`);
 
-    // --- 5. Connect and forward data ---
     const ssh = new SSHClient();
+
     ssh.on('ready', () => {
-      ssh.shell(
-        {
-          term: 'xterm-256color',  // 터미널 타입
-          cols: 80,                // 초기 컬럼 수
-          rows: 24,                // 초기 로우 수
-        },
-        (err, stream) => {
-          if (err) {
-            sock.emit('error', `Shell error: ${err.message}`);
-            return ssh.end();
-          }
-          // 이제 이 shell 채널은 “인터랙티브 로그인 셸” 취급되어
-          // 로그인 배너·MOTD·Last login 메시지가 자동으로 나옵니다.
-          this.clients.set(sock.id, { ssh, stream });
+      this.logger.log(`SSH connection ready for ${sock.id}`);
 
-          stream.on('data', buf => sock.emit('output', buf.toString()));
-          stream.on('close', () => ssh.end());
-          sock.on('input', inp => stream.write(inp.data));
-
-          // 2. SFTP 클라이언트 생성도 이 안으로 옮기기
-          ssh.sftp((err, sftp: SFTPWrapper) => {
-            if (err) return sock.emit('error', `SFTP error: ${err.message}`);
-            const client = new SftpClient();
-            client.sftp = () => Promise.resolve(sftp);
-            this.sftpClients.set(sock.id, client);
-          });
-
-          
-          ssh.exec('pwd', (err, pwdStream) => {
-            if (!err) {
-              let cwd = '';
-              pwdStream.on('data', c => (cwd += c.toString()));
-              pwdStream.on('close', () => {
-                cwd = cwd.trim();
-                sock.emit('sftp-pwd', cwd);
-              });
-            }
-          });
+      // 1. Create shell first
+      ssh.shell({ term: 'xterm-256color', cols: 80, rows: 24 }, async (err, stream) => {
+        if (err) {
+          sock.emit('error', `Shell error: ${err.message}`);
+          return ssh.end();
         }
-      );    
+        this.clients.set(sock.id, { ssh, stream });
+
+        // Shell event handlers
+        stream.on('data', buf => sock.emit('output', buf.toString()));
+        stream.on('close', () => ssh.end());
+        sock.on('input', ({ data }: InputPayload) => stream.write(data));
+
+        // 2. Create SFTP client separately
+        await this.createSftpClient(sock.id, sess, connectOpts);
+
+        // 3. Get current directory
+        ssh.exec('pwd', (e2, pwdStream) => {
+          if (!e2) {
+            let cwd = '';
+            pwdStream.on('data', c => cwd += c.toString());
+            pwdStream.on('close', () => sock.emit('sftp-pwd', cwd.trim()));
+          }
+        });
+      });
     });
 
-    ssh.on('error', (err) => {
-      this.logger.error(`SSH connection error [${sess.id}]: ${err.message}`);
+    ssh.on('error', err => {
+      this.logger.error(`SSH error for ${sock.id}: ${err.message}`);
       sock.emit('error', `SSH error: ${err.message}`);
     });
-
-
 
     ssh.connect(connectOpts);
   }
 
-  // @SubscribeMessage('sftp-upload')
-  // async handleUpload(
-  //   @MessageBody() { remotePath, fileName, data }: UploadPayload,
-  //   @ConnectedSocket() sock: Socket,
-  // ) {
-  //   const client = this.sftpClients.get(sock.id);
-  //   if (!client) return sock.emit('error', 'No SFTP client');
+  private async createSftpClient(socketId: string, sess: any, connectOpts: ConnectConfig) {
+    try {
+      const sftpClient = new SftpClient();
 
-  //   const temp = Buffer.from(data, 'base64');  // 클라이언트가 base64로 보낼 경우
-  //   try {
-  //     await client.put(temp, `${remotePath}/${fileName}`);
-  //     sock.emit('sftp-upload-success', { fileName, remotePath });
-  //   } catch (e) {
-  //     sock.emit('sftp-upload-error', e.message);
-  //   }
-  // }
+      // // Create separate SFTP connection options
+      // const sftpOpts: ConnectConfig = {
+      //   host: connectOpts.host,
+      //   port: connectOpts.port,
+      //   username: connectOpts.username,
+      //   tryKeyboard: true,
+      //   hostHash: 'sha256',
+      //   hostVerifier: () => true,
+      // };
 
-  // @SubscribeMessage('sftp-download')
-  // async handleDownload(
-  //   @MessageBody() { remoteFile }: DownloadPayload,
-  //   @ConnectedSocket() sock: Socket,
-  // ) {
-  //   const client = this.sftpClients.get(sock.id);
-  //   if (!client) return sock.emit('error', 'No SFTP client');
+      // if (sess.authMethod === 'key' && sess.privateKey) {
+      //   sftpOpts['privateKey'] = sess.privateKey;
+      // } else if (sess.password) {
+      //   sftpOpts['password'] = sess.password;
+      // }
 
-  //   try {
-  //     const buffer = await client.get(remoteFile);
-  //     sock.emit('sftp-download-data', {
-  //       remoteFile,
-  //       data: buffer.toString('base64'),
-  //     });
-  //   } catch (e) {
-  //     sock.emit('sftp-download-error', e.message);
-  //   }
-  // }
+      await sftpClient.connect(connectOpts);
 
+      // Add SFTP client to existing entry
+      const existingClient = this.clients.get(socketId);
+      if (existingClient) {
+        existingClient.sftp = sftpClient;
+        this.clients.set(socketId, existingClient);
+        this.logger.log(`SFTP client created for ${socketId}`);
+      }
 
+    } catch (error) {
+      this.logger.error(`SFTP client creation failed for ${socketId}: ${error.message}`);
+      // Don't emit error here, as it might interrupt the main SSH connection
+    }
+  }
 
+  @SubscribeMessage('sftp-list')
+  async handleList(
+    @MessageBody() { remotePath }: ListPayload,
+    @ConnectedSocket() sock: Socket,
+  ) {
+    const client = this.clients.get(sock.id);
+    if (!client) {
+      this.logger.error(`No client found for socket ${sock.id}`);
+      return sock.emit('sftp-list-error', 'Connection not found');
+    }
+    if (!client.sftp) {
+      this.logger.error(`SFTP client not ready for socket@@ ${sock.id}`);
+      return sock.emit('sftp-list-error', 'SFTP not ready');
+    }
+    try {
+      this.logger.log(`Listing directory: ${remotePath} for ${sock.id}`);
+      const list = await client.sftp.list(remotePath); // ✅ FIXED: remotePath 사용!
+      this.logger.log(`Directory listing success: ${list.length} items`);
+      sock.emit('sftp-list-data', { remotePath, list });
+    } catch (err: any) {
+      this.logger.error(`SFTP list error: ${err.message}`);
+      sock.emit('sftp-list-error', err.message);
+    }
+  }
+
+  // 🔥 파일 더블클릭 → vi/vim 실행용 신규 이벤트
+  @SubscribeMessage('explorer-open-file')
+  handleExplorerOpenFile(
+    @MessageBody() { filePath, editor }: { filePath: string, editor: 'vi' | 'vim' },
+    @ConnectedSocket() sock: Socket,
+  ) {
+    const client = this.clients.get(sock.id);
+    if (!client || !client.stream) {
+      sock.emit('error', '터미널 세션이 없습니다.');
+      return;
+    }
+    client.stream.write(`${editor} '${filePath.replace(/'/g, "'\\''")}'\n`);
+  }
+
+  @SubscribeMessage('sftp-move')
+  async handleSftpMove(
+    @MessageBody() { src, dest }: { src: string, dest: string },
+    @ConnectedSocket() sock: Socket,
+  ) {
+    const client = this.clients.get(sock.id);
+    if (!client?.sftp) return sock.emit('sftp-move-error', 'SFTP not ready');
+    try {
+      await client.sftp.rename(src, dest);
+      sock.emit('sftp-move-success', { src, dest });
+    } catch (e) {
+      sock.emit('sftp-move-error', e.message);
+    }
+  }
+
+  @SubscribeMessage('sftp-upload')
+  async handleSftpUpload(
+    @MessageBody() payload: UploadPayload,
+    @ConnectedSocket() sock: Socket,
+  ) {
+    const client = this.clients.get(sock.id);
+    if (!client?.sftp) {
+      this.logger.error(`SFTP client not ready for socket ${sock.id}`);
+      return sock.emit('sftp-upload-error', 'SFTP not ready');
+    }
+    try {
+      // base64를 Buffer로 변환
+      const buffer = Buffer.from(payload.data, 'base64');
+      // 업로드할 전체 경로
+      const targetPath =
+        payload.remotePath.endsWith("/")
+          ? payload.remotePath + payload.fileName
+          : payload.remotePath + "/" + payload.fileName;
+      await client.sftp.put(buffer, targetPath);
+      this.logger.log(`파일 업로드 완료: ${targetPath} (${buffer.length} bytes)`);
+      sock.emit('sftp-upload-success', { targetPath, size: buffer.length });
+      // 업로드 후 새로고침 용: 트리/탐색기에서 사용
+      sock.emit('sftp-list', { remotePath: payload.remotePath });
+    } catch (e: any) {
+      this.logger.error(`SFTP upload error: ${e.message}`);
+      sock.emit('sftp-upload-error', e.message);
+    }
+  }
 }

@@ -3,7 +3,7 @@ import { Server, PlusCircle, Trash2, Link2, Terminal as TerminalIcon, MenuIcon, 
 import NewSessionModal from '../components/NewSessionModal';
 import { useTerminals } from '../customhook/useTerminals';
 import 'xterm/css/xterm.css';
-import { SftpFileTree } from '../components/SftpFileTree';
+import { SftpFileManager } from '../components/SftpFileManager';
 
 
 export default function Terminals() {
@@ -15,7 +15,6 @@ export default function Terminals() {
     handleDelete,
     handleCreate,
     terminalContainerRef,
-    cwd
   } = useTerminals();
 
   const [sessionOpen, setSessionOpen] = useState(false);
@@ -137,18 +136,18 @@ export default function Terminals() {
         </div>
 
         {/* 터미널 본문 */}
-        <div className="flex-1 bg-[#1a1a2e] p-4 flex">
+        <div className="flex-1 flex h-0 min-h-0 bg-[#1a1a2e] p-4">
           {selectedId ? (
             <>
               {/* 왼쪽: SFTP 디렉토리 트리 (고정폭) */}
               <div className="w-64 mr-4">
-                <SftpFileTree basePath={cwd} />
+                <SftpFileManager />
               </div>
 
               {/* 오른쪽: xterm.js 터미널 */}
               <div
                 ref={terminalContainerRef}
-                className="flex-1 h-full min-h-[300px] bg-[#181927] rounded-lg overflow-hidden"
+                className="flex-1 h-full min-h-0 bg-[#181927] rounded-lg overflow-hidden"
               />
             </>
           ) : (
