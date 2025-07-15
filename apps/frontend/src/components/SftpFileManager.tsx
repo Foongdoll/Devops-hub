@@ -1,25 +1,28 @@
 import React, { useState, useEffect } from "react";
 import { Folder, File, ChevronRight, ChevronDown, RefreshCcw, ArrowLeft, Link2, EyeOff, Terminal, Cog } from "lucide-react";
 import { useSocket } from "../context/SocketContext";
-import { useGlobalUI } from "../context/GlobalUIContext";
+import { useSftp } from "../customhook/useSftp";
+
+export type SftpState = ReturnType<typeof useSftp>;
 
 type Entry = { name: string; type: "-" | "d" | "l", longname?: string };
 type ListData = { remotePath: string; list: Entry[] };
 type FileDialog = { file: Entry; path: string } | null;
 
-export function SftpFileManager() {
+export function SftpFileManager({ sftp }: { sftp?: SftpState }) {
   const { socket, emit } = useSocket();
-  const [mode, setMode] = useState<"explorer" | "tree">("tree");
-  const [tree, setTree] = useState<Record<string, Entry[]>>({});
-  const [cwd, setCwd] = useState<string>("/");
-  const [openDirs, setOpenDirs] = useState<Set<string>>(new Set(["/"]));
-  const [fileDialog, setFileDialog] = useState<FileDialog>(null);
-  const [dragging, setDragging] = useState<string | null>(null); // 드래그 중인 파일명(고유)
-  const [dropTarget, setDropTarget] = useState<string | null>(null); // 드롭 가능한 폴더명(경로)
-  const { showToast, setLoading } = useGlobalUI();
 
-  const [search, setSearch] = useState("");
+  if (!sftp) return null;
+  const {
+    mode, setMode, tree, setTree, cwd, setCwd,
+    openDirs, setOpenDirs, fileDialog, setFileDialog,
+    dragging, setDragging, dropTarget, setDropTarget,
+    search, setSearch, selected, setSelected,
+    showToast, setLoading, handleRefresh,
+    toggleSelect, handleDownloadSelected
+  } = sftp;
 
+  
 
   // 최초 연결 시 pwd+루트 트리 요청
   useEffect(() => {
@@ -43,12 +46,6 @@ export function SftpFileManager() {
     socket.on("sftp-list-data", onData);
     return () => { socket.off("sftp-list-data", onData); };
   }, [socket]);
-
-  // 새로고침
-  const handleRefresh = () => {
-    if (mode === "explorer") emit("sftp-list", { remotePath: cwd });
-    else emit("sftp-list", { remotePath: "/" });
-  };
 
   // 탐색기 폴더 이동
   const goTo = (dir: string) => {
@@ -135,6 +132,7 @@ export function SftpFileManager() {
             onDragOver={e => { e.preventDefault(); setDropTarget('상위 폴더'); }}
             onDragLeave={() => setDropTarget(null)}
             onDrop={e => {
+              e.stopPropagation();
               e.preventDefault();
               setDropTarget(null);
               setLoading(true);
@@ -164,6 +162,7 @@ export function SftpFileManager() {
         {
           filtered.map(entry => {
             // =========== 상태 분석 ===========
+            const fullPath = cwd === "/" ? `/${entry.name}` : `${cwd}/${entry.name}`;
             const isHidden = entry.name.startsWith(".");
             const isConfig = /\.(conf|ini|env|json|yaml|yml)$/i.test(entry.name);
             const isExecutable = entry.longname?.substring(3, 6).includes("x");
@@ -196,13 +195,14 @@ export function SftpFileManager() {
               <li
                 key={entry.name}
                 className={`
-    flex items-center gap-2 cursor-pointer rounded px-2 py-1
-    transition
-    ${entry.type === "d" ? "hover:bg-[#212a48] text-[#f1f2ff]" : "hover:bg-[#191a3c] text-[#8da7cf]"}
-    ${dragging === entry.name ? "ring-2 ring-[#ffbe6f] bg-[#3c3462] scale-105" : ""}
-    ${dropTarget === entry.name ? "bg-[#2835a7]/40 ring-2 ring-[#7a80fc]" : ""}
-    ${textClass}
-  `}
+                  flex items-center gap-2 cursor-pointer rounded px-2 py-1 transition
+                  ${selected.includes(fullPath) ? "bg-[#7a80fc]/80 text-white font-semibold" : ""}
+                  ${entry.type === "d" ? "hover:bg-[#212a48] text-[#f1f2ff]" : "hover:bg-[#191a3c] text-[#8da7cf]"}
+                  ${dragging === entry.name ? "ring-2 ring-[#ffbe6f] bg-[#3c3462] scale-105" : ""}
+                  ${dropTarget === entry.name ? "bg-[#2835a7]/40 ring-2 ring-[#7a80fc]" : ""}
+                  ${textClass}
+                `}
+                onClick={e => toggleSelect(e, fullPath)}
                 onDoubleClick={() => onEntryDoubleClick(entry)}
                 draggable={entry.type !== "d"}
                 onDragStart={e => {
@@ -350,6 +350,7 @@ export function SftpFileManager() {
             return (
               <li
                 key={fullPath}
+                onClick={e => toggleSelect(e, fullPath)}
                 className={`flex items-center rounded-sm cursor-pointer text-[15px] font-normal ${textClass}
                 hover:bg-[#25274a] hover:text-[#e6e8fe]`}
                 style={{ paddingLeft: `${35 + depth * 14}px` }}
@@ -370,7 +371,7 @@ export function SftpFileManager() {
 
 
   return (
-    <div className="bg-[#22223c] rounded-lg min-h-[440px] max-h-[650px] shadow-none border-none text-white flex flex-col">
+    <div className="bg-[#22223c] rounded-lg min-h-[100%] shadow-none border-none text-white flex flex-col" onClick={e => toggleSelect(e, "none")}>
       {/* 탭 헤더 */}
       <div className="flex items-center h-9 border-b border-[#393c58] bg-[#22223c] px-2 gap-1 whitespace-nowrap min-w-0">
         <span
@@ -396,11 +397,22 @@ export function SftpFileManager() {
           <RefreshCcw size={13} className="mb-[-2px] mr-[2px]" />
           새로고침
         </span>
-        <span className="ml-auto pr-3 text-[14px] font-normal text-[#888eaf] truncate">
-          {mode === "tree" ? "/" : cwd}
-        </span>
+
 
       </div>
+      {mode === "explorer" && (
+      <div className="flex flex-col items-center justify-between px-4 py-2 bg-[#22223c] border-b border-[#393c58] gap-2">
+        <span className="pr-3 text-[14px] font-normal text-[#888eaf] truncate">
+          현재 폴더 경로: {cwd}
+        </span>
+        <span
+          className="w-full ml-2 px-3 py-1 rounded bg-[#7a80fc] text-white cursor-pointer text-[14px] font-semibold hover:bg-[#5560be]"
+          onClick={handleDownloadSelected}
+        >
+          다운로드
+        </span>
+      </div>
+      )}
       {/* 본문 */}
       <div className="flex-1 max-h-[600px] overflow-y-auto py-1">
         {mode === "explorer" && (

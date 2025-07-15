@@ -4,14 +4,14 @@ import type { Session } from '../services/TerminalService';
 import { useGlobalUI } from '../context/GlobalUIContext';
 import { Terminal as XTerminal } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
-import { useSocket } from '../context/SocketContext';
 
-export function useTerminals() {
+export function useTerminals({ handleRefresh }: { handleRefresh?: () => void } = {}) {
   const { setLoading, setError } = useGlobalUI();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [output, setOutput] = useState<string>('');
   const [input, setInput] = useState<string>('');
+  const [isActiveStatus, setIsActiveStatus] = useState<string[]>([]);
 
   // Refs
   const terminalContainerRef = useRef<HTMLDivElement>(null);
@@ -49,10 +49,13 @@ export function useTerminals() {
     };
     window.addEventListener('resize', handleResize);
 
-
     // 키 입력 이벤트
     xterm.onData(data => {
+      // SSH에 1글자씩 전송
       send(data);
+      if(data === '\r') {
+        handleRefresh?.();
+      }     
     });
 
     return () => {
@@ -63,7 +66,7 @@ export function useTerminals() {
       inputBufferRef.current = '';
       window.removeEventListener('resize', handleResize); // 이벤트 리스너 정리
     };
-  }, [selectedId]);
+  }, [selectedId, terminalContainerRef]);
 
   // 4. 세션 생성 핸들러
   const handleCreate = async (data: Omit<Session, 'id' | 'status'>) => {
@@ -148,6 +151,7 @@ export function useTerminals() {
     const onOutput = (chunk: string) => {
       const term = xtermRef.current;
       if (term) {
+        setIsActiveStatus(prev => [...prev, selectedId]);
         term.write(chunk.replace(/\n/g, '\r\n'));
       }
 
@@ -162,6 +166,12 @@ export function useTerminals() {
 
   const send = (inputStr: string) => {
     TerminalService.sendInput(inputStr);
+
+    const trimmed = inputStr.trim();
+    if (trimmed === "exit" || trimmed === "quit") {
+      setSelectedId(null);
+      TerminalService.disconnectSession();
+    }
   };
 
   return {
@@ -178,5 +188,6 @@ export function useTerminals() {
     handleDelete,
     handleCreate,
     terminalContainerRef,
+    isActiveStatus
   };
 }

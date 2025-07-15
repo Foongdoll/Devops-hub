@@ -13,6 +13,10 @@ import { TerminalService } from './terminal.service';
 import { Logger } from '@nestjs/common';
 import SftpClient from 'ssh2-sftp-client';
 import { Buffer } from 'buffer';
+import archiver from 'archiver';
+
+
+
 
 interface StartPayload { sessionId: string; }
 interface InputPayload { data: string; }
@@ -135,26 +139,25 @@ export class SessionsGateway implements OnGatewayConnection, OnGatewayDisconnect
     ssh.connect(connectOpts);
   }
 
+  @SubscribeMessage('exit')
+  async onExit(
+    @ConnectedSocket() sock: Socket,
+  ) {
+    const client = this.clients.get(sock.id);
+    if (client) {
+      client.stream.end();
+      client.ssh.end();
+      client.sftp?.end();
+      this.clients.delete(sock.id);
+      this.logger.log(`Session exited for ${sock.id}`);
+    } else {
+      this.logger.warn(`No session found for ${sock.id}`);
+    }
+  }
+
   private async createSftpClient(socketId: string, sess: any, connectOpts: ConnectConfig) {
     try {
       const sftpClient = new SftpClient();
-
-      // // Create separate SFTP connection options
-      // const sftpOpts: ConnectConfig = {
-      //   host: connectOpts.host,
-      //   port: connectOpts.port,
-      //   username: connectOpts.username,
-      //   tryKeyboard: true,
-      //   hostHash: 'sha256',
-      //   hostVerifier: () => true,
-      // };
-
-      // if (sess.authMethod === 'key' && sess.privateKey) {
-      //   sftpOpts['privateKey'] = sess.privateKey;
-      // } else if (sess.password) {
-      //   sftpOpts['password'] = sess.password;
-      // }
-
       await sftpClient.connect(connectOpts);
 
       // Add SFTP client to existing entry
@@ -250,7 +253,67 @@ export class SessionsGateway implements OnGatewayConnection, OnGatewayDisconnect
       sock.emit('sftp-list', { remotePath: payload.remotePath });
     } catch (e: any) {
       this.logger.error(`SFTP upload error: ${e.message}`);
-      sock.emit('sftp-upload-error', e.message);
+      sock.emit('sftp-upload-error', e.message); 
     }
   }
+
+  @SubscribeMessage("sftp-download-zip")
+  async handleSftpDownloadZip(
+    @MessageBody() { files }: { files: string[] },
+    @ConnectedSocket() sock: Socket,
+  ) {
+    const client = this.clients.get(sock.id);
+    if (!client?.sftp) {
+      this.logger.error(`SFTP client not ready for socket ${sock.id}`);
+      return sock.emit('sftp-download-zip-error', 'SFTP not ready');
+    }
+    try {
+      this.logger.log(`SFTP download zip request for files: ${files.join(', ')}`);
+      // 실제 zip 생성 함수
+      const zipBuffer = await this.getSftpZip(client.sftp, files);
+      sock.emit('sftp-download-zip-success', zipBuffer.toString('base64'));
+    } catch (e: any) {
+      this.logger.error(`SFTP download zip error: ${e.message}`);
+      sock.emit('sftp-download-zip-error', e.message);
+    }
+  }
+
+  async getSftpZip(sftp: SftpClient, files: string[]): Promise<Buffer> {
+    return new Promise(async (resolve, reject) => {
+      const archive = archiver('zip', { zlib: { level: 9 } });
+      const outBuf: Buffer[] = [];
+      archive.on('data', d => outBuf.push(d));
+      archive.on('error', reject);
+      archive.on('end', () => resolve(Buffer.concat(outBuf)));
+
+      // 파일 하나씩 SFTP에서 읽어서 ZIP에 append
+      for (const remotePath of files) {
+        const filename = remotePath.split('/').pop();
+        // ssh2-sftp-client에서 파일을 stream으로 읽어오기
+        // get(path, [dst], {encoding, stream: true}) 쓰면 stream 리턴됨
+        // (패키지 버전에 따라 get에서 stream 바로 안 될 수도 있음 → getBuffer로도 가능)
+        const fileBuf = await sftp.get(remotePath); // Buffer 리턴
+        archive.append(fileBuf, { name: filename || 'unknown' });
+      }
+
+      archive.finalize();
+    });
+  }
+
+  @SubscribeMessage("sftp-download")
+  async handleSftpDownload(
+    @MessageBody() { file }: { file: string },
+    @ConnectedSocket() sock: Socket,
+  ) {
+    const client = this.clients.get(sock.id);
+    if (!client?.sftp) return sock.emit('sftp-download-error', 'SFTP not ready');
+    try {
+      const filename = file.split("/").pop()!;
+      const buf = await client.sftp.get(file);
+      sock.emit("sftp-download-success", { filename, data: buf.toString("base64") });
+    } catch (e: any) {
+      sock.emit("sftp-download-error", e.message);
+    }
+  }
+
 }

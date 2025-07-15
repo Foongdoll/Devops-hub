@@ -4,9 +4,14 @@ import NewSessionModal from '../components/NewSessionModal';
 import { useTerminals } from '../customhook/useTerminals';
 import 'xterm/css/xterm.css';
 import { SftpFileManager } from '../components/SftpFileManager';
+import { useSftp } from '../customhook/useSftp';
 
 
 export default function Terminals() {
+
+  const sftp = useSftp();
+  const { handleRefresh } = sftp;
+
   const {
     sessions,
     selectedId,
@@ -15,12 +20,14 @@ export default function Terminals() {
     handleDelete,
     handleCreate,
     terminalContainerRef,
-  } = useTerminals();
+    isActiveStatus
+  } = useTerminals({ handleRefresh });
+
+
 
   const [sessionOpen, setSessionOpen] = useState(false);
   const [isModalOpen, setModalOpen] = useState(false);
-  const active = sessions.find(s => s.id === selectedId);
-
+  const active = sessions.find(s => s.id === selectedId);  
 
   return (
     <div className="flex h-full min-h-screen">
@@ -116,11 +123,11 @@ export default function Terminals() {
                 {active.type} | {active.username}@{active.host}:{active.port}
               </span>
               <span className={`ml-4 px-2 py-0.5 rounded-full text-xs font-semibold
-                ${active.status === 'connected'
+                ${isActiveStatus.includes(active.id)
                   ? 'bg-green-100 text-green-700'
                   : 'bg-gray-200 text-gray-600'}`}
               >
-                {active.status === 'connected' ? '접속됨' : '대기 중'}
+                {isActiveStatus.includes(active.id) ? '접속됨' : '대기 중'}
               </span>
               <button
                 onClick={() => active && send('\n')}
@@ -141,7 +148,7 @@ export default function Terminals() {
             <>
               {/* 왼쪽: SFTP 디렉토리 트리 (고정폭) */}
               <div className="w-64 mr-4">
-                <SftpFileManager />
+                <SftpFileManager sftp={sftp} />
               </div>
 
               {/* 오른쪽: xterm.js 터미널 */}
