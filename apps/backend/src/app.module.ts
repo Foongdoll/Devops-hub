@@ -10,6 +10,8 @@ import { Role } from './auth/entities/auth-role.entity';
 import { RefreshToken } from './auth/entities/auth-refresh-token.entity';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { TerminalModule } from './terminal/terminal.module';
+import { GitManagerModule } from './git-manager/git-manager.module';
+import { GitGateway } from './git-manager/git-session.gateway';
 
 @Module({
   imports: [
@@ -38,10 +40,12 @@ import { TerminalModule } from './terminal/terminal.module';
     }),
     GlobalConfigModule,
     AuthModule,
-    TerminalModule
+    TerminalModule,
+    GitManagerModule
   ],
   controllers: [],
   providers: [
+    GitGateway,
     {
       provide: APP_FILTER,
       useClass: AllExceptionsFilter,

@@ -50,7 +50,7 @@ axiosInstance.interceptors.response.use(
   }
 );
 
-export async function apiRequest<T = any>(options: ApiRequestOptions): Promise<ApiResponse<T>> {
+export async function apiRequest<T = any>(options: ApiRequestOptions): Promise<T> {
   const { url, method, data, params, headers, timeout } = options;
   try {
     const response = await axiosInstance.request<ApiResponse<T>>({
@@ -60,8 +60,8 @@ export async function apiRequest<T = any>(options: ApiRequestOptions): Promise<A
       params,
       headers,
       timeout,
-    });
-    return response.data;
+    });    
+    return response.data as T;
   } catch (error) {    
     throw error; // 그대로 throw (또는 필요시 추가 가공)
   }

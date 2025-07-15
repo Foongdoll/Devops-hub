@@ -139,22 +139,6 @@ export class SessionsGateway implements OnGatewayConnection, OnGatewayDisconnect
     try {
       const sftpClient = new SftpClient();
 
-      // // Create separate SFTP connection options
-      // const sftpOpts: ConnectConfig = {
-      //   host: connectOpts.host,
-      //   port: connectOpts.port,
-      //   username: connectOpts.username,
-      //   tryKeyboard: true,
-      //   hostHash: 'sha256',
-      //   hostVerifier: () => true,
-      // };
-
-      // if (sess.authMethod === 'key' && sess.privateKey) {
-      //   sftpOpts['privateKey'] = sess.privateKey;
-      // } else if (sess.password) {
-      //   sftpOpts['password'] = sess.password;
-      // }
-
       await sftpClient.connect(connectOpts);
 
       // Add SFTP client to existing entry

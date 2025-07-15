@@ -8,11 +8,9 @@ interface TopBarProps {
   onToggleSidebar: () => void;
 }
 
-const getTitle = (pathname: string) => {
-  if (pathname.startsWith('/channel/notice')) return '# 공지';
-  if (pathname.startsWith('/channel/new-project')) return '# 프로젝트-신제품';
-  if (pathname.startsWith('/channel/marketing')) return '# 팀-마케팅';
+const getTitle = (pathname: string) => {  
   if (pathname.startsWith('/terminals')) return '터미널';
+  if (pathname.startsWith('/git')) return 'Git 관리';
   return '대시보드';
 };
 

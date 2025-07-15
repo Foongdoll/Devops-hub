@@ -7,6 +7,7 @@ import Join from './pages/Join';
 import DashboardLayout from './layout/DashboardLayout';
 import Dashboard from './pages/Dashboard';
 import Terminals from './pages/Terminals';
+import GitManagerMain from './pages/GitManager';
 
 const RequireAuth = ({ children }: { children: React.ReactNode }) => {
   const isAuthed = React.useMemo(() => !!localStorage.getItem('accessToken'), []);
@@ -32,6 +33,7 @@ const App = () => (
           {/* 이 두 개만 이 아래에 둡니다 */}
           <Route index        element={<Dashboard />} />
           <Route path="terminals" element={<Terminals />} />
+          <Route path="git" element={<GitManagerMain />} />
 
           {/* 추가로 /settings, /git 등도 이 아래에 계속 추가 */}
         </Route>
