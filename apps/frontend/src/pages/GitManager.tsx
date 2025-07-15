@@ -596,4 +596,3 @@ export default function GitManager() {
       <GitConfigModal open={showConfigModal} onClose={() => setShowConfigModal(false)} />
     </>
   );
-}

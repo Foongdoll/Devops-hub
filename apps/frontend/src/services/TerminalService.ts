@@ -46,8 +46,7 @@ export function connectSession(
   socket.off('error');
   socket.off('disconnect');
   socket.off('connect_error');
-
-  // 3) 필요한 이벤트 리스너 등록
+  
   socket.on('output', (data: string) => {
     onOutput(data);
   });
@@ -73,10 +72,40 @@ export function sendInput(data: string) {
 export function disconnectSession() {
   const socket = socketService.getSocket();
   if (socket && socket.connected) {
-    socket.emit('stop');
+    socket.emit('exit');
     socket.off('output');
     socket.off('error');
     socket.off('disconnect');
     socket.off('connect_error');
   }
+}
+
+export const zipDownloadEvent = (callback: (data: boolean) => void) => {
+  const socket = socketService.getSocket();
+  if (!socket) {
+    console.error('Socket not connected');
+    return;
+  }
+  // 3) 필요한 이벤트 리스너 등록
+  socket.on('sftp-download-zip-success', (base64data) => {
+    // 1. base64 → Blob 변환
+    const byteString = atob(base64data);
+    const arrayBuffer = new ArrayBuffer(byteString.length);
+    const uint8Array = new Uint8Array(arrayBuffer);
+    for (let i = 0; i < byteString.length; i++) {
+      uint8Array[i] = byteString.charCodeAt(i);
+    }
+    const blob = new Blob([uint8Array], { type: 'application/zip' });
+
+    // 2. Blob → URL 만들어 다운로드 트리거
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'download.zip'; // 원하는 파일명
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    callback;
+  });
 }
