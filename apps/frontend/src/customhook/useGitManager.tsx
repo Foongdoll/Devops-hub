@@ -199,7 +199,7 @@ export const useGitManager = () => {
       await delay(1000);
       hideLoading();
       showToast(isPushForward ? "커밋 후 푸시가 완료되었습니다." : "커밋이 성공적으로 완료되었습니다.", "success");
-      fetchChangedFiles(false);
+      fetchChangedFiles(!showStageTab);
       setCommitMsg("");
       setSelectedFile(null);
     });
