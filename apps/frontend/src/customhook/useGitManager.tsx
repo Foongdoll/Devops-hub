@@ -192,7 +192,7 @@ export const useGitManager = () => {
       await delay(1000);
       hideLoading();
       showToast(isPushForward ? "커밋 후 푸시가 완료되었습니다." : "커밋이 성공적으로 완료되었습니다.", "success");      
-      setStagedFiles([]);
+      fetchChangedFiles();
       setCommitMsg("");
       setSelectedFile(null);
     });
@@ -201,9 +201,7 @@ export const useGitManager = () => {
       hideLoading();
       showToast("커밋에 실패했습니다.", "error");
     });
-
-    setLoading(false);
-    setStagedFiles([]);
+        
     setCommitMsg("");
     setSelectedFile(null);
   };
