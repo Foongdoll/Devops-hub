@@ -3,12 +3,19 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 import type { ReactNode } from "react";
 import { subscribe } from "../utils/notifyStore";
 
+interface ConfirmOptions {
+  confirmText?: string;
+  cancelText?: string;
+  danger?: boolean;
+}
+
 interface GlobalUIContextProps {
   loading: boolean;
   setLoading: (val: boolean) => void;
   error: string | null;
   setError: (msg: string | null) => void;
   showToast: (message: string, type: 'success' | 'error' | 'info' | 'warn') => void;
+  showConfirm: (message: string, description?: string, options?: ConfirmOptions) => Promise<boolean>;
 }
 
 const GlobalUIContext = createContext<GlobalUIContextProps | undefined>(undefined);
@@ -23,6 +30,14 @@ export function GlobalUIProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' | 'warn' } | null>(null);
+  // ✅ Confirm 상태
+  const [confirmState, setConfirmState] = useState<{
+    open: boolean;
+    message: string;
+    description?: string;
+    options?: ConfirmOptions;
+    resolve?: (result: boolean) => void;
+  }>({ open: false, message: "" });
 
   // 여기서 구독해서 notifyStore의 showToast 호출을 실제로 "받아" 처리합니다.
   useEffect(() => {
@@ -36,6 +51,20 @@ export function GlobalUIProvider({ children }: { children: ReactNode }) {
     });
     return unsubscribe;
   }, []);
+
+  const showConfirm = (message: string, description?: string, options?: ConfirmOptions) => {
+    return new Promise<boolean>(resolve => {
+      setConfirmState({
+        open: true, message, description, options,
+        resolve
+      });
+    });
+  };
+
+  const handleConfirm = (result: boolean) => {
+    confirmState.resolve?.(result);
+    setConfirmState({ open: false, message: "" });
+  };
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' | 'warn') => {
     setToast({ message, type });
@@ -89,6 +118,33 @@ export function GlobalUIProvider({ children }: { children: ReactNode }) {
               " text-xl"
             }>•</span>
             <span className="flex-1">{toast.message}</span>
+          </div>
+        )}
+        {confirmState.open && (
+          <div className="fixed inset-0 z-[1000] bg-black/30 flex items-center justify-center">
+            <div className="bg-white rounded-2xl p-8 min-w-[320px] max-w-xs shadow-xl border border-[#e0e0f0] flex flex-col gap-4 animate-fade-in-up">
+              <div className="font-bold text-lg text-[#4b2ea7]">{confirmState.message}</div>
+              {confirmState.description && (
+                <div className="text-gray-500 text-sm">{confirmState.description}</div>
+              )}
+              <div className="flex gap-2 mt-2 justify-end">
+                <button
+                  className="px-4 py-1.5 rounded-lg font-semibold border bg-gray-100 hover:bg-gray-200 text-gray-700"
+                  onClick={() => handleConfirm(false)}
+                >
+                  {confirmState.options?.cancelText || "취소"}
+                </button>
+                <button
+                  className={`px-4 py-1.5 rounded-lg font-semibold text-white ${confirmState.options?.danger
+                      ? "bg-red-500 hover:bg-red-700"
+                      : "bg-[#7e4cff] hover:bg-[#5630b4]"
+                    }`}
+                  onClick={() => handleConfirm(true)}
+                >
+                  {confirmState.options?.confirmText || "확인"}
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>

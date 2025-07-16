@@ -189,16 +189,15 @@ export const useGitManager = () => {
     setLoading(true);
     gitSocket.emit('git-commit', { stagedFiles, commitMsg, repoPath: selectedRemote?.path, isPushForward });
     gitSocket.on('git-commit-success', async (data) => {
-      await delay(500);
+      await delay(1000);
       hideLoading();
-      showToast(isPushForward ? "커밋 후 푸시가 완료되었습니다." : "커밋이 성공적으로 완료되었습니다.", "success");
-      setChangedFiles([]);
+      showToast(isPushForward ? "커밋 후 푸시가 완료되었습니다." : "커밋이 성공적으로 완료되었습니다.", "success");      
       setStagedFiles([]);
       setCommitMsg("");
       setSelectedFile(null);
     });
     gitSocket.on('git-commit-error', async (error) => {
-      await delay(500);
+      await delay(1000);
       hideLoading();
       showToast("커밋에 실패했습니다.", "error");
     });
