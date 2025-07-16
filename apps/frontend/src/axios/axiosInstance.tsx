@@ -1,7 +1,8 @@
 import axios, { AxiosError } from 'axios';
 import type { AxiosResponse } from 'axios';
-import { showToast } from '../utils/notifyStore';
+import { hideLoading, showLoading, showToast } from '../utils/notifyStore';
 import type { ApiRequestOptions, ApiResponse, ApiError } from '../interface/AxiosInterface';
+import { delay } from '../utils/comm';
 
 // env 인식 못함 npm 설치 필요~ 산책 다녀와서 할 것 !!
 const axiosInstance = axios.create({
@@ -30,10 +31,11 @@ axiosInstance.interceptors.response.use(
     if (message) {
       showToast(message, type || 'success');
     }
+
     return res.data;
   },
   (err: AxiosError<any>) => {
-    
+
     const apiError: ApiError = {
       success: false,
       message: err.response?.data?.message || err.message || '알 수 없는 오류',
@@ -45,7 +47,7 @@ axiosInstance.interceptors.response.use(
     // 401(토큰만료) 등 특수 처리 가능
     if (apiError?.statusCode === 401) localStorage.removeItem('accessToken');
 
-    const customError = apiError as ApiError; // 타입 단일화(실패도 ApiResponse)
+    const customError = apiError as ApiError; // 타입 단일화(실패도 ApiResponse)    
     return Promise.reject(customError);
   }
 );
@@ -53,6 +55,7 @@ axiosInstance.interceptors.response.use(
 export async function apiRequest<T = any>(options: ApiRequestOptions): Promise<T> {
   const { url, method, data, params, headers, timeout } = options;
   try {
+    showLoading();
     const response = await axiosInstance.request<ApiResponse<T>>({
       url,
       method: method.toLowerCase() as any,
@@ -60,9 +63,14 @@ export async function apiRequest<T = any>(options: ApiRequestOptions): Promise<T
       params,
       headers,
       timeout,
-    });    
+    });
+
+    await delay(500);
+    hideLoading();
     return response.data as T;
-  } catch (error) {    
+  } catch (error) {
+    await delay(800);
+    hideLoading();
     throw error; // 그대로 throw (또는 필요시 추가 가공)
   }
 }

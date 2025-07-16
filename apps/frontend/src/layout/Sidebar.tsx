@@ -20,7 +20,7 @@ interface SidebarProps {
 const mainMenus = [
   { icon: <Home />, label: '대시보드', path: '/' },
   { icon: <Server />, label: '서버 관리', path: '/servers' },
-  { icon: <Terminal />, label: 'SSH/FTP/SFTP 접속', path: '/terminals' },
+  { icon: <Terminal />, label: 'SSH 접속', path: '/terminals' },
   { icon: <GitBranch />, label: 'Git 저장소', path: '/git' },
   { icon: <Cloud />, label: 'S3 & 파일 관리', path: '/storage' },
   { icon: <Settings />, label: '설정', path: '/settings' },

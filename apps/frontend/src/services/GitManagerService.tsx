@@ -24,6 +24,7 @@ export const deleteRemote = async (id: string): Promise<Remote> => {
   });
 };
 
+
 // gitSocket.ts (싱글턴)
 // 한 번만 인스턴스를 만든다!
 class GitSocket {

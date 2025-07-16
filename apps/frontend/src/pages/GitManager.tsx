@@ -1,141 +1,162 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Plus, Trash2, Github, ChevronLeft, Settings,
   ArrowDownToLine, ArrowUpToLine, GitCommit, RefreshCcw, Boxes
 } from "lucide-react";
-import { useGitManager } from "../customhook/useGitManager";
-
-// 더미 파일 (실제로는 API로 불러옴)
-const initialChangedFiles = [
-  { name: "apps/backend/src/app.module.ts", status: "M" },
-  { name: "apps/frontend/src/App.tsx", status: "A" },
-  { name: "apps/frontend/src/layout/TopBar.tsx", status: "M" },
-];
+import { useGitManager, type GitStatusFile, type Remote } from "../customhook/useGitManager";
 
 function classNames(...classes: string[]) {
   return classes.filter(Boolean).join(" ");
 }
 
-const mockChangedFiles = [
-  {
-    name: "apps/frontend/src/layout/TopBar.tsx", status: "M", diff: [
-      { type: "del", content: "const getTitle = (pathname: string) =>{" },
-      { type: "del", content: "  if(pathname.startsWith('/channel/notice')) return '# 공지';" },
-      { type: "del", content: "  if(pathname.startsWith('/channel/new-project')) return '🚀 프로젝트·신제품';" },
-      { type: "del", content: "  if(pathname.startsWith('/channel/marketing')) return '🎯 팀·마케팅';" },
-      { type: "add", content: "const getTitle = (pathname: string) =>{" },
-      { type: "add", content: "  if(pathname.startsWith('/terminals')) return '타이밍';" },
-      { type: "add", content: "  if(pathname.startsWith('/git')) return 'Git 관리';" },
-      { type: "ctx", content: "  return '넥시트';" }
-    ]
-  },
-  {
-    name: "apps/frontend/src/App.tsx", status: "A", diff: [
-      { type: "add", content: "import React from 'react';" },
-      { type: "add", content: "const App = () => <div>Hello</div>;" }
-    ]
-  },
-  {
-    name: "apps/backend/src/app.module.ts", status: "M", diff: [
-      { type: "ctx", content: "// unchanged code..." },
-      { type: "del", content: "export class OldAppModule {}" },
-      { type: "add", content: "export class AppModule {}" }
-    ]
-  }
-];
-function StageTab({ setChangedFiles, setStagedFiles, changedFiles, stagedFiles, onStage, onUnstage, tab, setTab, commitMsg, setCommitMsg, onCommit }: any) {
-  const [selectedFile, setSelectedFile] = useState<any | null>(null);
+function StageTab({
+  setChangedFiles, setStagedFiles,
+  changedFiles, stagedFiles,
+  onStage, onUnstage,
+  tab, setTab,
+  commitMsg, setCommitMsg,
+  handleCommit,
+  onDiffFileClick,
+  selectedFile,
+  setSelectedFile,
+  setIsPushForward,
+  isPushForward,
+  branchNames,
+  selectedBranch,
+  setSelectedBranch
+}: {
+  setStagedFiles: (files: GitStatusFile[]) => void,
+  setChangedFiles: (files: GitStatusFile[]) => void,
+  changedFiles: GitStatusFile[], stagedFiles: GitStatusFile[],
+  onStage: (file: GitStatusFile) => void,
+  onUnstage: (file: GitStatusFile) => void,
+  tab: "change" | "stage" | "commit", setTab: (tab: "change" | "stage" | "commit") => void,
+  commitMsg: string,
+  setCommitMsg: (msg: string) => void,
+  handleCommit: () => void,
+  onDiffFileClick: (file: GitStatusFile, staged?: boolean) => void;
+  selectedFile: GitStatusFile | null;
+  setSelectedFile: (file: GitStatusFile | null) => void;
+  setIsPushForward: (push: boolean) => void;
+  isPushForward: boolean,
+  branchNames: string[],
+  selectedBranch: string | null,
+  setSelectedBranch: (branch: string | null) => void
+}) {
+
 
   // 스테이징/언스테이징
-  const handleStage = (file: any) => {
-    setChangedFiles(changedFiles.filter(f => f.name !== file.name));
+  const handleStage = (file: GitStatusFile) => {
+    setChangedFiles(changedFiles.filter(f => f.file !== file.file));      // name → file
     setStagedFiles([...stagedFiles, file]);
-    setSelectedFile(selectedFile?.name === file.name ? null : selectedFile);
-  };
-  const handleUnstage = (file: any) => {
-    setStagedFiles(stagedFiles.filter(f => f.name !== file.name));
-    setChangedFiles([...changedFiles, file]);
-    setSelectedFile(selectedFile?.name === file.name ? null : selectedFile);
+    setSelectedFile(selectedFile?.file === file.file ? null : selectedFile);
   };
 
-  // 커밋 실행
-  const handleCommit = () => {
-    alert(
-      `커밋 완료!\n메시지: ${commitMsg}\n파일:\n${stagedFiles.map(f => f.name).join("\n")}`
-    );
-    setStagedFiles([]);
-    setCommitMsg("");
-    setSelectedFile(null);
+  const handleUnstage = (file: GitStatusFile) => {
+    setStagedFiles(stagedFiles.filter(f => f.file !== file.file));
+    setChangedFiles([...changedFiles, file]);
+    setSelectedFile(selectedFile?.file === file.file ? null : selectedFile);
   };
 
   // 파일 리스트 UI(재사용)
   function FileList({ files, onClick, onAction, actionLabel, color }: any) {
     return (
       <ul className="border rounded bg-white divide-y">
-        {files.map((file: any) => (
+        {files.map((file: GitStatusFile) => (
           <li
-            key={file.name}
+            key={file.file}
             className={classNames(
               "flex items-center justify-between px-3 py-2 cursor-pointer hover:bg-blue-50 transition",
-              selectedFile?.name === file.name ? "bg-blue-50" : ""
+              selectedFile?.file === file.file ? "bg-blue-50" : ""
             )}
             onClick={() => onClick(file)}
           >
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-1 min-w-0">
               <span className={classNames(
-                "text-xs px-2 py-0.5 rounded font-bold",
+                "text-xs px-2 py-0.5 rounded font-bold shrink-0",
                 file.status === "A" ? "bg-green-100 text-green-700"
                   : file.status === "D" ? "bg-red-100 text-red-600"
-                    : "bg-yellow-100 text-yellow-700"
+                    : file.status === "M" ? "bg-yellow-100 text-yellow-700"
+                      : "bg-gray-200 text-gray-500"
               )}>
                 {file.status}
               </span>
-              <span className="text-sm">{file.name}</span>
+              {/* 파일명 ...처리, 호버시 툴팁 */}
+              <span
+                className="text-sm truncate max-w-[240px] block"
+                title={file.file}
+                style={{ lineHeight: "1.5" }}
+              >
+                {file.file}
+              </span>
             </div>
-            <button
-              className={`ml-2 text-xs font-semibold hover:underline`}
-              style={{ color }}
-              onClick={e => { e.stopPropagation(); onAction(file); }}
-            >{actionLabel}</button>
+            {/* 버튼 width 고정, 중앙정렬 */}
+            <div className="flex items-center" style={{ minWidth: 72, justifyContent: 'flex-end' }}>
+              <button
+                className="ml-2 text-xs font-semibold hover:underline px-2 py-1"
+                style={{ color, minWidth: 64, textAlign: 'center' }}
+                onClick={e => { e.stopPropagation(); onAction(file); }}
+              >{actionLabel}</button>
+            </div>
           </li>
         ))}
       </ul>
     );
   }
 
-  // Diff 뷰어
-  function DiffViewer({ diff }: { diff: any[] }) {
+
+  function DiffViewer({ diff }: { diff: string[] }) {
     if (!diff) return <div className="text-gray-400 p-8">변경 내용을 볼 파일을 선택하세요.</div>;
     return (
-      <pre className="rounded-lg bg-[#17171a] text-sm p-5 overflow-auto text-[#e7e5ed] select-text font-mono leading-6">
-        {diff.map((line, idx) => (
-          <div key={idx}
-            className={classNames(
-              "whitespace-pre",
-              line.type === "add" && "bg-green-900/40 text-[#99ffbc]",
-              line.type === "del" && "bg-red-900/40 text-[#ff99a3]",
-              line.type === "ctx" && "text-[#e7e5ed]"
-            )}>
-            <span>
-              {line.type === "add" ? "+" : line.type === "del" ? "-" : " "}
-            </span>
-            {line.content}
-          </div>
-        ))}
-      </pre>
+      <div className="w-[100%] h-full max-h-[65vh] min-h-[250px] flex justify-center items-stretch"
+        style={{ background: "#16151e", borderRadius: "16px" }}>
+        <pre
+          className="
+              w-max      /* 내용만큼 넓게, 단 min-w-[600px] 이하로는 줄어들지 않음 */
+              min-w-full /* 부모 크기 이하로는 안 줄어듦 */
+              max-w-[1200px] /* 초광폭 화면에서 너무 넓어지지 않게 제한 */
+              h-full m-0 text-sm text-[#e7e5ed] select-text font-mono leading-6
+            "
+          style={{
+            border: "none",
+            padding: "2rem 2.5rem",
+            margin: 0,
+            background: "transparent",
+          }}
+        >
+          {diff.map((line, idx) => {
+            let lineType = "ctx", content = line;
+            if (line.startsWith("+")) lineType = "add";
+            else if (line.startsWith("-")) lineType = "del";
+            else if (line.startsWith("@@")) lineType = "hunk";
+            let bg = "";
+            if (lineType === "add") bg = "bg-green-900/40 text-[#99ffbc]";
+            if (lineType === "del") bg = "bg-red-900/40 text-[#ff99a3]";
+            if (lineType === "hunk") bg = "bg-[#2a2350] text-[#b7a9fa] font-bold";
+            if (lineType === "ctx") bg = "text-[#e7e5ed]";
+            return (
+              <span key={idx} className={`block whitespace-pre ${bg}`}>
+                {content}
+              </span>
+            );
+          })}
+        </pre>
+      </div>
     );
   }
 
+
+
   return (
-    <div className="flex h-[80vh] w-full bg-[#f8f6fc] overflow-hidden">
+    <div className="flex h-[80vh] bg-[#f8f6fc] overflow-hidden">
       {/* 좌측 패널 */}
-      <div className="w-[420px] min-w-[260px] border-r border-[#e2e0f7] bg-[#f8f6fc] flex flex-col">
+      <div className="w-[20%] min-w-[260px] border-r border-[#e2e0f7] bg-[#f8f6fc] flex flex-col">
         {/* 스테이지 파일 */}
         <div className="p-4 pb-2 font-bold text-[#5e4889] text-base border-b bg-[#f3f1fa]">스테이지 파일</div>
         <div className="flex-1 overflow-auto p-2">
           <FileList
             files={stagedFiles}
-            onClick={setSelectedFile}
+            onClick={onDiffFileClick}
             onAction={handleUnstage}
             actionLabel="내리기"
             color="#ff8585"
@@ -146,7 +167,7 @@ function StageTab({ setChangedFiles, setStagedFiles, changedFiles, stagedFiles, 
         <div className="flex-1 overflow-auto p-2">
           <FileList
             files={changedFiles}
-            onClick={setSelectedFile}
+            onClick={onDiffFileClick}
             onAction={handleStage}
             actionLabel="올리기"
             color="#7a80fc"
@@ -154,16 +175,32 @@ function StageTab({ setChangedFiles, setStagedFiles, changedFiles, stagedFiles, 
         </div>
       </div>
       {/* 우측 Diff + 커밋 메시지 */}
-      <div className="flex-1 flex flex-col">
+      <div className="w-[80%] flex flex-col overflow-hidden">
         <div className="p-4 border-b bg-[#f3f1fa] border-[#e2e0f7] font-bold text-[#322446]">
           변경 내용 미리보기
+          <span className="ml-auto flex items-center gap-2">
+            <span className="text-xs text-[#7a80fc]">커밋/푸쉬 브랜치:</span>
+            <select
+              className="px-2 py-1 rounded border border-[#e0e0ef] bg-white text-[#4b2ea7] font-semibold text-sm"
+              value={selectedBranch || ""}
+              onChange={e => setSelectedBranch(e.target.value)}
+            >
+              {branchNames.map(branch => (
+                <option key={branch} value={branch}>{branch}</option>
+              ))}
+            </select>
+          </span>
         </div>
-        <div className="flex-1 overflow-auto p-5">
-          {selectedFile
-            ? <DiffViewer diff={selectedFile.diff} />
-            : <div className="flex items-center justify-center h-full text-gray-400 text-lg">좌측에서 파일을 클릭하세요.</div>
-          }
+        <div className="w-full m-auto max-w-[98%] h-full max-h-[65vh] min-h-[250px] flex justify-center items-stretch"
+          style={{ background: "#16151e", borderRadius: "16px" }}>
+          <div className="w-full overflow-x-auto">
+            {selectedFile
+              ? <DiffViewer diff={selectedFile.diff || []} />
+              : <div className="flex items-center justify-center h-full text-gray-400 text-lg">좌측에서 파일을 클릭하세요.</div>
+            }
+          </div>
         </div>
+
         {/* 커밋 메시지/버튼 박스 */}
         <div className="p-6 border-t bg-[#f8f6fc] border-[#e2e0f7]">
           <div className="flex flex-col md:flex-row items-center gap-3">
@@ -177,11 +214,15 @@ function StageTab({ setChangedFiles, setStagedFiles, changedFiles, stagedFiles, 
             />
             <button
               className="min-w-[120px] px-5 py-2 rounded bg-[#7a80fc] hover:bg-[#4b2ea7] text-white font-semibold text-sm transition"
-              disabled={!stagedFiles.length || !commitMsg.trim()}
               onClick={handleCommit}
             >
               커밋 실행
             </button>
+            <span className="text-sm text-gray-500 flex items-center gap-2">
+              커밋과 동시에 푸쉬
+              <input type="checkbox" checked={isPushForward} onChange={e => setIsPushForward(e.target.checked)} />
+            </span>
+
           </div>
           {!stagedFiles.length &&
             <div className="mt-1 text-xs text-gray-400 text-center">스테이지에 올린 파일이 없습니다.</div>
@@ -293,31 +334,6 @@ function RemoteList({
   );
 }
 
-const mockCommits = [
-  {
-    hash: "5f767b",
-    message: "feat: 스크롤바 커스텀 css 추가",
-    branches: ["main", "origin/main"], // 여러 브랜치 가능!
-    date: "2025-07-15 19:38",
-    author: "Foongdoll",
-  },
-  {
-    hash: "88f41d",
-    message: "feat: 트리/탐색기 등 모듈 단위 분리, 드래그 & 드롭 구현 등",
-    branches: [],
-    date: "2025-07-15 00:03",
-    author: "Foongdoll",
-  },
-  {
-    hash: "c2b694c",
-    message: "doc: React 공통 컴포넌트, Context 생성",
-    branches: ["origin/master"],
-    date: "2025-07-11 00:04",
-    author: "Foongdoll",
-  }
-  // ... 이하 생략
-];
-
 function BranchLabels({ branches }: { branches: string[] }) {
   if (!branches || branches.length === 0) return null;
   return (
@@ -338,21 +354,69 @@ function BranchLabels({ branches }: { branches: string[] }) {
 }
 // ===================== GitRepository (with Stage Tab) =====================
 
-function GitRepository({ remote, onBack, onShowConfig, commits }: any) {
-  const [showStageTab, setShowStageTab] = useState(false);
-  const [tab, setTab] = useState<"change" | "stage" | "commit">("change");
-  const [changedFiles, setChangedFiles] = useState(mockChangedFiles);
-  const [stagedFiles, setStagedFiles] = useState<any[]>([]);
-  const [commitMsg, setCommitMsg] = useState("");
+function GitRepository({
+  remote,
+  onBack,
+  onShowConfig,
+  commits,
+  setChangedFiles,
+  setStagedFiles,
+  changedFiles,
+  stagedFiles,
+  commitMsg,
+  setCommitMsg,
+  setTab,
+  tab,
+  showStageTab,
+  setShowStageTab,
+  fetchChangedFiles,
+  onDiffFileClick,
+  selectedFile,
+  setSelectedFile,
+  handleCommit,
+  setIsPushForward,
+  isPushForward,
+  selectedBranch,
+  setSelectedBranch
+}:
+  {
+    remote: Remote;
+    onBack: () => void;
+    onShowConfig: () => void;
+    commits: any[];
+    setChangedFiles: (files: GitStatusFile[]) => void;
+    setStagedFiles: (files: GitStatusFile[]) => void;
+    changedFiles: GitStatusFile[];
+    stagedFiles: GitStatusFile[];
+    commitMsg: string;
+    setCommitMsg: (msg: string) => void;
+    setTab: (tab: "change" | "stage" | "commit") => void;
+    tab: "change" | "stage" | "commit";
+    showStageTab: boolean;
+    setShowStageTab: (show: boolean) => void;
+    fetchChangedFiles: () => void;
+    onDiffFileClick: (file: GitStatusFile, staged?: boolean) => void;
+    selectedFile: GitStatusFile | null;
+    setSelectedFile: (file: GitStatusFile | null) => void;
+    handleCommit: () => void;
+    setIsPushForward: (push: boolean) => void;
+    isPushForward: boolean;
+    selectedBranch: string | null;
+    setSelectedBranch: (branch: string | null) => void;
+  }
+) {
 
   // 모든 브랜치명 추출
   const branchNames = commits.map(b => b.branch);
-  // 선택된 브랜치 (초기값: '전체')
-  const [selectedBranch, setSelectedBranch] = useState<string>("전체");
+
   // 펼침/접힘 상태 (브랜치별)
-  const [openMap, setOpenMap] = useState<{ [branch: string]: boolean }>(
+  const [openMap, setOpenMap] = useState<{ [branch: string]: boolean }>(() =>
     Object.fromEntries(branchNames.map(b => [b, true]))
   );
+
+  useEffect(() => {
+    setOpenMap(Object.fromEntries(branchNames.map(b => [b, true])));
+  }, [branchNames]);
 
   // 토글 함수
   const toggleBranch = (branch: string) => {
@@ -368,25 +432,16 @@ function GitRepository({ remote, onBack, onShowConfig, commits }: any) {
       ? commits
       : commits.filter(b => b.branch === selectedBranch);
 
-  const handleStage = (file: any) => {
-    setChangedFiles(changedFiles.filter(f => f.name !== file.name));
+  const handleStage = (file: GitStatusFile) => {
+    setChangedFiles(changedFiles.filter(f => f.file !== file.file));
     setStagedFiles([...stagedFiles, file]);
     setTab("stage");
   };
-  const handleUnstage = (file: any) => {
-    setStagedFiles(stagedFiles.filter(f => f.name !== file.name));
+  const handleUnstage = (file: GitStatusFile) => {
+    setStagedFiles(stagedFiles.filter(f => f.file !== file.file));
     setChangedFiles([...changedFiles, file]);
     setTab("change");
   };
-  const handleCommit = () => {
-    // 실제로는 커밋 API 호출
-    alert(`커밋 완료!\n메시지: ${commitMsg}\n파일:\n${stagedFiles.map(f => f.name).join("\n")}`);
-    setStagedFiles([]);
-    setCommitMsg("");
-    setShowStageTab(false);
-    setTab("change");
-  };
-
   return (
     <div className="flex flex-col bg-[#f8f6fc] min-h-[80vh]">
       {/* 상단 툴바 */}
@@ -412,7 +467,7 @@ function GitRepository({ remote, onBack, onShowConfig, commits }: any) {
         </button>
         <button
           className="flex items-center gap-1 px-3 py-1 rounded bg-[#7a80fc] hover:bg-[#4b2ea7] text-white text-sm font-semibold"
-          onClick={() => setShowStageTab(v => !v)}
+          onClick={fetchChangedFiles}
         >
           <GitCommit className="w-4 h-4" /> Commit
         </button>
@@ -437,7 +492,15 @@ function GitRepository({ remote, onBack, onShowConfig, commits }: any) {
             setTab={setTab}
             commitMsg={commitMsg}
             setCommitMsg={setCommitMsg}
-            onCommit={handleCommit}
+            handleCommit={handleCommit}
+            onDiffFileClick={onDiffFileClick}
+            selectedFile={selectedFile}
+            setSelectedFile={setSelectedFile}
+            setIsPushForward={setIsPushForward}
+            isPushForward={isPushForward}
+            branchNames={branchNames}
+            selectedBranch={selectedBranch}
+            setSelectedBranch={setSelectedBranch}
           />
         ) : (
           <div className="flex flex-col relative px-8 py-8 bg-[#f8f6fc] min-h-[80vh]">
@@ -447,8 +510,8 @@ function GitRepository({ remote, onBack, onShowConfig, commits }: any) {
             <div className="flex gap-2 mb-8 flex-wrap">
               <button
                 className={`px-3 py-1 rounded text-sm font-semibold border ${selectedBranch === "전체"
-                    ? "bg-[#7a80fc] text-white border-[#7a80fc]"
-                    : "bg-white text-[#7a80fc] border-[#7a80fc] hover:bg-[#ece9fd]"
+                  ? "bg-[#7a80fc] text-white border-[#7a80fc]"
+                  : "bg-white text-[#7a80fc] border-[#7a80fc] hover:bg-[#ece9fd]"
                   }`}
                 onClick={() => setSelectedBranch("전체")}
               >
@@ -458,8 +521,8 @@ function GitRepository({ remote, onBack, onShowConfig, commits }: any) {
                 <button
                   key={branch}
                   className={`px-3 py-1 rounded text-sm font-semibold border ${selectedBranch === branch
-                      ? "bg-[#7a80fc] text-white border-[#7a80fc]"
-                      : "bg-white text-[#7a80fc] border-[#7a80fc] hover:bg-[#ece9fd]"
+                    ? "bg-[#7a80fc] text-white border-[#7a80fc]"
+                    : "bg-white text-[#7a80fc] border-[#7a80fc] hover:bg-[#ece9fd]"
                     }`}
                   onClick={() => setSelectedBranch(branch)}
                 >
@@ -570,7 +633,26 @@ export default function GitManager() {
     handleAddRemote,
     handleDeleteRemote,
     handleSelectRemote,
-    commits
+    commits,
+    setShowStageTab,
+    showStageTab,
+    setTab,
+    tab,
+    setChangedFiles,
+    setStagedFiles,
+    changedFiles,
+    stagedFiles,
+    commitMsg,
+    setCommitMsg,
+    fetchChangedFiles,
+    onDiffFileClick,
+    selectedFile,
+    setSelectedFile,
+    handleCommit,
+    setIsPushForward,
+    isPushForward,
+    selectedBranch,
+    setSelectedBranch
   } = useGitManager();
 
   return (
@@ -582,6 +664,25 @@ export default function GitManager() {
             onBack={() => setSelectedRemote(null)}
             onShowConfig={() => setShowConfigModal(true)}
             commits={commits}
+            setChangedFiles={setChangedFiles}
+            setStagedFiles={setStagedFiles}
+            setShowStageTab={setShowStageTab}
+            showStageTab={showStageTab}
+            changedFiles={changedFiles}
+            stagedFiles={stagedFiles}
+            commitMsg={commitMsg}
+            setCommitMsg={setCommitMsg}
+            setTab={setTab}
+            tab={tab}
+            fetchChangedFiles={fetchChangedFiles}
+            onDiffFileClick={onDiffFileClick}
+            selectedFile={selectedFile}
+            setSelectedFile={setSelectedFile}
+            handleCommit={handleCommit}
+            setIsPushForward={setIsPushForward}
+            isPushForward={isPushForward}
+            selectedBranch={selectedBranch}
+            setSelectedBranch={setSelectedBranch}
           />
         )
         : (
@@ -596,3 +697,4 @@ export default function GitManager() {
       <GitConfigModal open={showConfigModal} onClose={() => setShowConfigModal(false)} />
     </>
   );
+}
