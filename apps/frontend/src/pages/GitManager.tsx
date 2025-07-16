@@ -526,7 +526,7 @@ function GitRepository({
         </button>
         <button
           className="flex items-center gap-1 px-3 py-1 rounded bg-[#7a80fc] hover:bg-[#4b2ea7] text-white text-sm font-semibold"
-          onClick={fetchChangedFiles}
+          onClick={() => fetchChangedFiles()}
         >
           <GitCommit className="w-4 h-4" /> Commit
         </button>

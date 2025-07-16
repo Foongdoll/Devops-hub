@@ -137,19 +137,20 @@ export const useGitManager = () => {
   };
 
   // 커밋 탭 - 변경된 파일 목록 가져오기
-  const fetchChangedFiles = async (sw = showStageTab) => {
-    // 항상 true로 세팅 (즉, 스테이지 탭이 열려있게)
-    setShowStageTab(true);
-
-    // 탭이 이미 열려 있고, sw가 true라면 초기화만 하고 종료
-    if (showStageTab && sw) {
+  const fetchChangedFiles = async (sw = false) => {
+    console.log(sw);
+    if (sw) {
+      setShowStageTab(true);
+    } else {
+      setShowStageTab(prev => !prev);
+    }
+    if (showStageTab && !sw) {
       setChangedFiles([]);
       setStagedFiles([]);
       setSelectedFile(null);
       return;
     }
-    // 탭이 열릴 때만 로딩
-    if (!showStageTab && sw) {
+    if (showStageTab && !sw) {
       setLoading(true);
     }
 
@@ -158,16 +159,19 @@ export const useGitManager = () => {
     gitSocket.on('git-status-data', async (data) => {
       const changed = data.filter((e: { file: string; staged: boolean; status: string }) => !e.staged);
       const staged = data.filter((e: { file: string; staged: boolean; status: string }) => e.staged);
-
-      await delay(500);
-      hideLoading();
+      if (showStageTab && !sw) {
+        await delay(500);
+        hideLoading();
+      }
       setChangedFiles(changed);
       setStagedFiles(staged);
     });
 
     gitSocket.on('git-status-error', async (error) => {
-      await delay(500);
-      hideLoading();
+      if (showStageTab && !sw) {
+        await delay(500);
+        hideLoading();
+      }
       showToast("변경된 파일 목록을 가져오는 데 실패했습니다.", "error");
     });
   };
@@ -185,6 +189,7 @@ export const useGitManager = () => {
 
   // 커밋 실행
   const handleCommit = () => {
+
     if (commitMsg === "") {
       showToast("커밋 메시지를 입력해주세요.", "error");
       return;
@@ -193,19 +198,15 @@ export const useGitManager = () => {
       return;
     }
     setLoading(true);
-
     gitSocket.emit('git-commit', { stagedFiles, commitMsg, repoPath: selectedRemote?.path, isPushForward });
-
     gitSocket.on('git-commit-success', async (data) => {
       await delay(1000);
       hideLoading();
       showToast(isPushForward ? "커밋 후 푸시가 완료되었습니다." : "커밋이 성공적으로 완료되었습니다.", "success");
-      // 항상 탭이 열리게 true로!
       fetchChangedFiles(true);
       setCommitMsg("");
       setSelectedFile(null);
     });
-
     gitSocket.on('git-commit-error', async (error) => {
       await delay(1000);
       hideLoading();
