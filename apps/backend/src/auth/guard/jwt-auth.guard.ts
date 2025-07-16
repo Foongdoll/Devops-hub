@@ -6,10 +6,11 @@ import { GlobalConfigService } from 'src/global/global-config.service';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
-  constructor(private readonly globalConfigService: GlobalConfigService) {}
+  constructor(private readonly globalConfigService: GlobalConfigService) { }
   canActivate(context: ExecutionContext): boolean {
-     const req = context.switchToHttp().getRequest();
+    const req = context.switchToHttp().getRequest();    
     const token = req.headers['authorization']?.replace('Bearer ', '');
+    
     if (!token) throw new UnauthorizedException('Access Token 없음');
 
     try {

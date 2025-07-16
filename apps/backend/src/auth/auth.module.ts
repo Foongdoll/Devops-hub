@@ -2,11 +2,11 @@ import { Module } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtModule } from '@nestjs/jwt';
-import { JwtTokenService } from './jwt.service';
 import { RefreshToken } from './entities/auth-refresh-token.entity';
 import { Role } from './entities/auth-role.entity';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { User } from './entities/auth-user.entity';
+import { JwtTokenService } from './jwt.service';
 
 @Module({
   imports: [
@@ -18,5 +18,6 @@ import { User } from './entities/auth-user.entity';
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtTokenService],
+  exports: [JwtTokenService]
 })
 export class AuthModule {}

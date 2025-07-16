@@ -3,12 +3,11 @@ import { TerminalService } from './terminal.service';
 import { TerminalController } from './terminal.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Session } from './entities/session.entity';
-import { SessionsGateway } from './Session.gateway';
+import { AuthModule } from 'src/auth/auth.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Session])],
+  imports: [TypeOrmModule.forFeature([Session]), AuthModule],
   controllers: [TerminalController],
-  providers: [TerminalService, SessionsGateway],
-  exports: [SessionsGateway]
+  providers: [TerminalService],
 })
-export class TerminalModule {}
+export class TerminalModule { }

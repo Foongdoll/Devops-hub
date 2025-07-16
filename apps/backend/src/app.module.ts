@@ -45,7 +45,7 @@ import { GitGateway } from './git-manager/git-session.gateway';
   ],
   controllers: [],
   providers: [
-    GitGateway,
+    GitGateway,    
     {
       provide: APP_FILTER,
       useClass: AllExceptionsFilter,

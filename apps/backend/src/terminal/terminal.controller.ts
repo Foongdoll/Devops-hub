@@ -1,14 +1,19 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, NotFoundException } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, NotFoundException, UseGuards } from '@nestjs/common';
 import { TerminalService } from './terminal.service';
 import { Session } from './entities/session.entity';
 import { ApiResponse } from 'src/common/dto/response.dto';
+import { JwtAuthGuard } from 'src/auth/guard/jwt-auth.guard';
+import { RoleGuard } from 'src/auth/guard/role.guard';
+import { Roles } from 'src/common/decorator/rols.decorator';
 
+@UseGuards(JwtAuthGuard, RoleGuard)
+@Roles('USER')
 @Controller('terminal')
 export class TerminalController {
   constructor(private readonly svc: TerminalService) { }
 
   @Get('getSessions')
-  async list(): Promise<ApiResponse> {    
+  async list(): Promise<ApiResponse> {
     return await this.svc.findAll();
   }
 
@@ -27,7 +32,7 @@ export class TerminalController {
   }
 
   @Delete('deleteSession/:id')
-  remove(@Param('id') id: string) : Promise<ApiResponse>{
+  remove(@Param('id') id: string): Promise<ApiResponse> {
     return this.svc.remove(id);
   }
 }

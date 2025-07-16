@@ -6,14 +6,19 @@ import {
   SubscribeMessage,
   MessageBody,
   ConnectedSocket,
+  OnGatewayInit,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { ConnectConfig, Client as SSHClient } from 'ssh2';
 import { TerminalService } from './terminal.service';
-import { Logger } from '@nestjs/common';
+import { Inject, Logger, UseGuards } from '@nestjs/common';
 import SftpClient from 'ssh2-sftp-client';
 import { Buffer } from 'buffer';
 import archiver from 'archiver';
+import { Roles } from 'src/common/decorator/rols.decorator';
+import { RoleGuard } from 'src/auth/guard/role.guard';
+import { JwtAuthGuard } from 'src/auth/guard/jwt-auth.guard';
+import { JwtTokenService } from 'src/auth/jwt.service';
 
 
 
@@ -34,14 +39,33 @@ interface UploadPayload {
     credentials: true,
   },
 })
-export class SessionsGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class SessionsGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer() io: Server;
 
   private clients = new Map<string, { ssh: SSHClient; stream: any; sftp?: SftpClient }>();
   private readonly logger = new Logger(SessionsGateway.name);
 
-  constructor(private readonly sessions: TerminalService) { }
+  constructor(
+    private readonly sessions: TerminalService,    
+    private readonly jwtService: JwtTokenService) { }
 
+  afterInit(server: Server) {
+    server.use(async (socket, next) => {
+      try {        
+        const token = socket.handshake.auth?.token;        
+        if (!token) return next(new Error('No token'));
+        const payload = this.jwtService.verifyAccessToken(token);
+        socket.data.user = payload;
+        next();
+      } catch (e) {
+        next(new Error('Auth failed: ' + e.message));
+      }
+    });
+  }
+
+
+  @UseGuards(JwtAuthGuard, RoleGuard)
+  @Roles('USER')
   handleConnection(sock: Socket) {
     this.logger.log(`WebSocket connected: ${sock.id}`);
   }
@@ -200,6 +224,7 @@ export class SessionsGateway implements OnGatewayConnection, OnGatewayDisconnect
     }
   }
 
+
   // 🔥 파일 더블클릭 → vi/vim 실행용 신규 이벤트
   @SubscribeMessage('explorer-open-file')
   handleExplorerOpenFile(
@@ -254,7 +279,7 @@ export class SessionsGateway implements OnGatewayConnection, OnGatewayDisconnect
       sock.emit('sftp-list', { remotePath: payload.remotePath });
     } catch (e: any) {
       this.logger.error(`SFTP upload error: ${e.message}`);
-      sock.emit('sftp-upload-error', e.message); 
+      sock.emit('sftp-upload-error', e.message);
     }
   }
 

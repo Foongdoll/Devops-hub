@@ -29,5 +29,5 @@ export class User {
 
     @ManyToOne(() => RefreshToken, { eager: true, nullable: true })
     @JoinColumn({ name: "refreshTokenCd" }) 
-    refreshToken: RefreshToken;
+    refreshToken: RefreshToken | null;
 }

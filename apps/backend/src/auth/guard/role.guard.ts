@@ -17,7 +17,9 @@ export class RoleGuard implements CanActivate {
 
     const request = context.switchToHttp().getRequest();
     const user = request.user as JwtPayload;
-    if (!user || !user.roles || !user.roles.some(role => requiredRoles.includes(role))) {
+    if (!user ||
+      !user.roles ||
+      requiredRoles.map(role => user.roles.map(r => r.roleName.toUpperCase() === role.toUpperCase())).length === 0) {
       throw new ForbiddenException('접근 권한이 없습니다.');
     }
 
