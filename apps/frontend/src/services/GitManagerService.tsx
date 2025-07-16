@@ -33,6 +33,7 @@ class GitSocket {
     this.gitSocket = io("ws://localhost:3000/git", {
       withCredentials: true,
       transports: ["websocket"],
+      auth: { token: localStorage.getItem('accessToken') }
     });
   }
   public on(event: string, callback: (...args: any[]) => void) {

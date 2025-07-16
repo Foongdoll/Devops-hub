@@ -14,8 +14,9 @@ class SocketService {
       transports: ['websocket', 'polling'],
       timeout: 20000,
       reconnection: true,
-      reconnectionAttempts: this.maxReconnectAttempts,
+      reconnectionAttempts: 5,
       reconnectionDelay: 1000,
+      auth: { token: localStorage.getItem('accessToken') }
     });
 
     this.socket.on('connect', () => {
@@ -30,7 +31,7 @@ class SocketService {
     this.socket.on('connect_error', (error) => {
       console.error('Socket connection error:', error);
       this.reconnectAttempts++;
-      
+
       if (this.reconnectAttempts >= this.maxReconnectAttempts) {
         console.error('Max reconnection attempts reached');
       }
