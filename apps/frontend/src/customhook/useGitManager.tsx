@@ -145,21 +145,28 @@ export const useGitManager = () => {
       setSelectedFile(null);
       return;
     }
-    setLoading(true);
+    if (sw) {
+      setLoading(true);
+    }
+
     // 선택한 리모트의 변경된 파일 목록 가져오기
     gitSocket.emit('git-status', { repoPath: selectedRemote?.path });
     gitSocket.on('git-status-data', async (data) => {
       const changed = data.filter((e: { file: string; staged: boolean; status: string }) => !e.staged);
       const staged = data.filter((e: { file: string; staged: boolean; status: string }) => e.staged);
-      await delay(500);
-      hideLoading();
+      if (sw) {
+        await delay(500);
+        hideLoading();
+      }
       setChangedFiles(changed);
       setStagedFiles(staged);
     });
 
     gitSocket.on('git-status-error', async (error) => {
-      await delay(500);
-      hideLoading();
+      if (sw) {
+        await delay(500);
+        hideLoading();
+      }
       showToast("변경된 파일 목록을 가져오는 데 실패했습니다.", "error");
     });
 
@@ -191,7 +198,7 @@ export const useGitManager = () => {
     gitSocket.on('git-commit-success', async (data) => {
       await delay(1000);
       hideLoading();
-      showToast(isPushForward ? "커밋 후 푸시가 완료되었습니다." : "커밋이 성공적으로 완료되었습니다.", "success");      
+      showToast(isPushForward ? "커밋 후 푸시가 완료되었습니다." : "커밋이 성공적으로 완료되었습니다.", "success");
       fetchChangedFiles(false);
       setCommitMsg("");
       setSelectedFile(null);
@@ -201,7 +208,7 @@ export const useGitManager = () => {
       hideLoading();
       showToast("커밋에 실패했습니다.", "error");
     });
-        
+
     setCommitMsg("");
     setSelectedFile(null);
   };
