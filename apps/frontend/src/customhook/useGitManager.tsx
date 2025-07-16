@@ -31,9 +31,16 @@ export type GitStatusFile = {
   diff?: string[];
 }
 
+export interface PullConflictModalProps {
+  open: boolean;
+  conflictFiles: string[];
+  onResolve: () => void;    // 해결 완료 콜백
+  onClose: () => void;      // 모달 닫기 콜백
+  details?: string;         // (선택) 추가 상세 메시지
+}
 
 export const useGitManager = () => {
-  const { showToast, setLoading } = useGlobalUI();
+  const { showToast, setLoading, showConfirm } = useGlobalUI();
   const [remotes, setRemotes] = useState<Remote[]>([]);
   const [selectedRemote, setSelectedRemote] = useState<Remote | null>(null);
   const [showRemoteModal, setShowRemoteModal] = useState(false);
@@ -50,7 +57,11 @@ export const useGitManager = () => {
   const [selectedFile, setSelectedFile] = useState<GitStatusFile | null>(null);
   const [isPushForward, setIsPushForward] = useState(false);
   const [selectedBranch, setSelectedBranch] = useState<string | null>(null);
+  const [branchList, setBranchList] = useState<string[]>([]);
   // ==============================
+  const [showConflictModal, setShowConflictModal] = useState(false);
+  const [conflictFiles, setConflictFiles] = useState<string[]>([]);
+  const [pullDetails, setPullDetails] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchRemotes = async () => {
@@ -64,7 +75,6 @@ export const useGitManager = () => {
     if (!selectedRemote) {
       fetchRemotes();
     }
-
   }, [selectedRemote]);
 
   // 리모드 삭제
@@ -99,7 +109,7 @@ export const useGitManager = () => {
   }
 
   // 리모트 선택
-  const handleSelectRemote = (remote: Remote) => {
+  const handleSelectRemote = async (remote: Remote) => {
     if (selectedRemote && selectedRemote.id === remote.id) {
       setSelectedRemote(null);
       return;
@@ -108,10 +118,12 @@ export const useGitManager = () => {
     // 해당 리모트 커밋히스토리 가져오기
     gitSocket.emit('git-all-branches-commits', { repoPath: remote.path, limit: 30 });
 
-    gitSocket.on('git-all-branches-commits-data', async (data) => {
+    gitSocket.on('git-all-branches-commits-data', async (data: GitBranchCommits[]) => {
       await delay(500);
       hideLoading();
       setCommits(data);
+      const initBranchList = data.map(b => b.branch);
+      setBranchList(initBranchList);
     });
     // 커밋 히스토리 에러..! 
     gitSocket.on('git-all-branches-commits-error', async (error) => {
@@ -130,6 +142,7 @@ export const useGitManager = () => {
     if (showStageTab) {
       setChangedFiles([]);
       setStagedFiles([]);
+      setSelectedFile(null);
       return;
     }
     setLoading(true);
@@ -149,6 +162,7 @@ export const useGitManager = () => {
       hideLoading();
       showToast("변경된 파일 목록을 가져오는 데 실패했습니다.", "error");
     });
+
   };
 
   const onDiffFileClick = (file: GitStatusFile) => {
@@ -177,7 +191,7 @@ export const useGitManager = () => {
     gitSocket.on('git-commit-success', async (data) => {
       await delay(500);
       hideLoading();
-      showToast("커밋이 성공적으로 완료되었습니다.", "success");
+      showToast(isPushForward ? "커밋 후 푸시가 완료되었습니다." : "커밋이 성공적으로 완료되었습니다.", "success");
       setChangedFiles([]);
       setStagedFiles([]);
       setCommitMsg("");
@@ -195,8 +209,134 @@ export const useGitManager = () => {
     setSelectedFile(null);
   };
 
+  // 깃 풀
+  const handlePull = async () => {
+    gitSocket.emit('git-pull', { repoPath: selectedRemote?.path, branch: selectedBranch, strategy: "" });
+
+    gitSocket.on('git-pull-success', ({ message }) => showToast(message, "success"));
+    gitSocket.on('git-pull-error', ({ message }) => showToast(message, "error"));
+
+    gitSocket.on('git-pull-conflict', ({ message, stderr }) => {
+      // 1. 충돌 안내
+      showToast(message, "warn");
+      // 2. 충돌 파일 리스트, diff 등 보여주는 컴포넌트 오픈
+      setConflictFiles(stderr.split('\n').filter(f => f.trim() !== ""));
+      setPullDetails(stderr);
+      setShowConflictModal(true);
+    });
+  }
+
+  // 충돌 해결
+  const handleResolve = () => {
+    setLoading(true);
+    // 1. 서버에 '남은 충돌파일' 체크 요청
+    gitSocket.emit('git-conflict-check', { repoPath: selectedRemote?.path });
+
+    gitSocket.on('git-conflict-check-result', async ({ remainConflicts }) => {
+      setLoading(false);
+      if (!remainConflicts || remainConflicts.length === 0) {
+        // 모든 충돌 해결됨: 자동 커밋
+        setShowConflictModal(false);
+        const res = await showConfirm("충돌이 모두 해결되었습니다.", "충돌 커밋을 진행하시겠습니까?");
+        if (!res) return;
+
+        // 커밋 실행
+        gitSocket.emit('git-commit', {
+          repoPath: selectedRemote?.path,
+          commitMsg: 'Resolve merge conflicts',
+          stagedFiles: conflictFiles,     // 충돌 파일 목록
+          isPushForward: false,
+        });
+
+        // 커밋 완료 이벤트 수신
+        gitSocket.on('git-commit-success', () => {
+          showToast("충돌 커밋이 완료되었습니다.", "success");
+          // 필요하다면 추가 동작(새로고침 등)
+        });
+        gitSocket.on('git-commit-error', (error) => {
+          showToast("충돌 커밋에 실패했습니다: " + (error.message || error), "error");
+        });
+
+      } else {
+        showToast(
+          `아직 충돌이 남아있습니다:\n${remainConflicts.join("\n")}\n모든 파일을 수정/스테이지 후 다시 시도해주세요.`,
+          'error'
+        );
+      }
+    });
+
+
+    gitSocket.on('git-conflict-check-error', ({ message }) => {
+      setLoading(false);
+      showToast("충돌 상태 확인 실패: " + message, 'error');
+    });
+  };
+
+  const handlePush = async () => {
+    gitSocket.emit('git-push', { repoPath: selectedRemote?.path, remote: "origin", branch: selectedBranch });
+
+    gitSocket.on('git-push-success', ({ message }) => {
+      showToast("Push 완료: " + message, "success");
+    });
+
+    gitSocket.on('git-push-error', ({ message }) => {
+      showToast("Push 실패: " + message, "error");
+    });
+  }
+
+  const handleFetch = async () => {
+    setLoading(true);
+    gitSocket.emit('git-fetch', { repoPath: selectedRemote?.path, remote: "origin" });
+
+    gitSocket.on('git-fetch-success', ({ message }) => {
+      showToast("Fetch 완료: " + message, "success");
+      setLoading(false);
+    });
+    gitSocket.on('git-fetch-error', ({ message }) => {
+      showToast("Fetch 실패: " + message, "error");
+      setLoading(false);
+    });
+  };
+
+  // STASH (변경사항 임시 저장)
+  const handleStash = async () => {
+    setLoading(true);
+    gitSocket.emit('git-stash', { repoPath: selectedRemote?.path });
+
+    gitSocket.on('git-stash-success', ({ message }) => {
+      showToast("Stash 완료: " + message, "success");
+      setLoading(false);
+    });
+    gitSocket.on('git-stash-error', ({ message }) => {
+      showToast("Stash 실패: " + message, "error");
+      setLoading(false);
+    });
+  };
+
+  // POP STASH (임시 저장 불러오기)
+  const handlePopStash = async () => {
+    setLoading(true);
+    gitSocket.emit('git-stash-pop', { repoPath: selectedRemote?.path });
+
+    gitSocket.on('git-stash-pop-success', ({ message }) => {
+      showToast("Stash pop 완료: " + message, "success");
+      setLoading(false);
+    });
+    gitSocket.on('git-stash-pop-error', ({ message }) => {
+      showToast("Stash pop 실패: " + message, "error");
+      setLoading(false);
+    });
+  };
+
 
   return {
+    // 
+    handlePull,
+    handleResolve,
+    handlePush,
+    handleFetch,
+    handleStash,
+    handlePopStash,
     // 원격 저장소 관련 상태
     remotes,
     setRemotes,
@@ -212,7 +352,8 @@ export const useGitManager = () => {
     handleDeleteRemote,
     handleAddRemote,
     handleSelectRemote,
-
+    branchList,
+    setBranchList,
     commits,
     handleCommit,
     setIsPushForward,
@@ -233,6 +374,12 @@ export const useGitManager = () => {
     fetchChangedFiles,
     onDiffFileClick,
     selectedFile,
-    setSelectedFile
+    setSelectedFile,
+    showConflictModal,
+    setShowConflictModal,
+    conflictFiles,
+    setConflictFiles,
+    pullDetails,
+    setPullDetails
   }
 }
