@@ -137,15 +137,15 @@ export const useGitManager = () => {
   };
 
   // 커밋 탭 - 변경된 파일 목록 가져오기
-  const fetchChangedFiles = async (sw = showStageTab) => {
-    setShowStageTab(prev => !prev);
-    if (showStageTab && sw) {
+  const fetchChangedFiles = async (sw = false) => {
+    setShowStageTab(sw ? true : prev => !prev);
+    if (showStageTab) {
       setChangedFiles([]);
       setStagedFiles([]);
       setSelectedFile(null);
       return;
     }
-    if (showStageTab && sw) {
+    if (showStageTab) {
       setLoading(true);
     }
 
@@ -199,7 +199,7 @@ export const useGitManager = () => {
       await delay(1000);
       hideLoading();
       showToast(isPushForward ? "커밋 후 푸시가 완료되었습니다." : "커밋이 성공적으로 완료되었습니다.", "success");
-      fetchChangedFiles(!showStageTab);
+      fetchChangedFiles(true);
       setCommitMsg("");
       setSelectedFile(null);
     });
