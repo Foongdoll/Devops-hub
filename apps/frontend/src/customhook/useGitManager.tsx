@@ -145,7 +145,7 @@ export const useGitManager = () => {
       setSelectedFile(null);
       return;
     }
-    if (sw) {
+    if (showStageTab && sw) {
       setLoading(true);
     }
 
@@ -154,7 +154,7 @@ export const useGitManager = () => {
     gitSocket.on('git-status-data', async (data) => {
       const changed = data.filter((e: { file: string; staged: boolean; status: string }) => !e.staged);
       const staged = data.filter((e: { file: string; staged: boolean; status: string }) => e.staged);
-      if (sw) {
+      if (showStageTab && sw) {
         await delay(500);
         hideLoading();
       }
