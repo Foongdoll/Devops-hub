@@ -11,12 +11,11 @@ import {
 import { Server, Socket } from 'socket.io';
 import { Inject, Logger, UseGuards } from '@nestjs/common';
 import { promisify } from 'util';
-import { exec } from 'child_process';
-import { JwtAuthGuard } from 'src/auth/guard/jwt-auth.guard';
-import { RoleGuard } from 'src/auth/guard/role.guard';
-import { Roles } from 'src/common/decorator/rols.decorator';
+import { exec, execFile } from 'child_process';
 import { JwtTokenService } from 'src/auth/jwt.service';
+import path from 'path';
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 @WebSocketGateway({
   namespace: '/git', // ★★★ "/git" 네임스페이스(중요)
@@ -101,6 +100,50 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
       sock.emit('git-all-branches-commits-error', e.message);
     }
   }
+
+  @SubscribeMessage('git-counts')
+  async getGitCounts(
+    @MessageBody() { repoPath }: { repoPath: string },
+    @ConnectedSocket() sock: Socket,
+  ) {
+    try {
+      repoPath = path.resolve(repoPath);
+
+      // 1) Determine current branch name
+      const { stdout: branchStd } = await execFileAsync(
+        'git',
+        ['-C', repoPath, 'rev-parse', '--abbrev-ref', 'HEAD']
+      );
+      const branch = branchStd.trim();
+
+      // 2) Get behind/ahead counts vs. origin
+      const { stdout: countStd } = await execFileAsync(
+        'git',
+        ['-C', repoPath, 'rev-list', '--left-right', '--count', `HEAD...origin/${branch}`]
+      );
+      // countStd is like "5\t2"
+      const [behindStr, aheadStr] = countStd.trim().split('\t');
+      const pullCount = parseInt(behindStr, 10);
+      const pushCount = parseInt(aheadStr, 10);
+
+      // 3) Get fetch dry-run count (lines of updates)
+      const { stdout: fetchStd } = await execFileAsync(
+        'git',
+        ['-C', repoPath, 'fetch', '--dry-run']
+      );
+      const fetchCount = fetchStd
+        .split('\n')
+        .filter(line => line.trim() !== '')
+        .length;
+
+      // 4) Emit all three
+      sock.emit('git-counts-data', { pullCount, pushCount, fetchCount });
+    } catch (e) {
+      this.logger.error(`Git counts error: ${e.message}`);
+      sock.emit('git-counts-error', e.message);
+    }
+  }
+
 
   @SubscribeMessage('git-status')
   async getGitStatus(
@@ -233,12 +276,16 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
     @ConnectedSocket() sock: Socket,
   ) {
     try {
-      // 1. pull 명령어 조합
-      let pullCmd = `git -C "${repoPath}" pull ${remote} ${branch}`;
-      if (strategy === "rebase") pullCmd += " --rebase";
-      if (strategy === "ff-only") pullCmd += " --ff-only";
 
-      const { stdout, stderr } = await execAsync(pullCmd);
+      // 1. pull 명령어 조합      
+      const pullArgs = ['-C', repoPath, 'pull', remote];
+      if (branch !== '전체') {
+        pullArgs.push(branch);
+      }
+      if (strategy === "rebase") pullArgs.push(" --rebase");
+      if (strategy === "ff-only") pullArgs.push(" --ff-only");
+
+      const { stdout, stderr } = await execFileAsync("git", pullArgs);
 
       const out = (stdout + stderr).toLowerCase();
 
@@ -301,6 +348,7 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
         details: out,
       });
     } catch (e: any) {
+      this.logger.error(`git-pull-error: ${e.message}`);
       // execAsync에서 오류 발생 시
       sock.emit("git-pull-error", {
         type: "exception",

@@ -428,42 +428,50 @@ function GitRepository({
   isPushForward,
   selectedBranch,
   setSelectedBranch,
-  branchList,
-  setBranchList,
+  branchList,  
   handlePull,
-  handlePush
-}:
-  {
-    remote: Remote;
-    onBack: () => void;
-    onShowConfig: () => void;
-    commits: any[];
-    setChangedFiles: (files: GitStatusFile[]) => void;
-    setStagedFiles: (files: GitStatusFile[]) => void;
-    changedFiles: GitStatusFile[];
-    stagedFiles: GitStatusFile[];
-    commitMsg: string;
-    setCommitMsg: (msg: string) => void;
-    setTab: (tab: "change" | "stage" | "commit") => void;
-    tab: "change" | "stage" | "commit";
-    showStageTab: boolean;
-    setShowStageTab: (show: boolean) => void;
-    fetchChangedFiles: () => void;
-    onDiffFileClick: (file: GitStatusFile, staged?: boolean) => void;
-    selectedFile: GitStatusFile | null;
-    setSelectedFile: (file: GitStatusFile | null) => void;
-    handleCommit: () => void;
-    setIsPushForward: (push: boolean) => void;
-    isPushForward: boolean;
-    selectedBranch: string | null;
-    setSelectedBranch: (branch: string | null) => void;
-    branchList: string[];
-    setBranchList: (branches: string[]) => void;
-    handlePull: () => void;
-    handlePush: () => void;
-  }
-) {
-
+  handlePush,
+  pullCount,
+  pushCount,
+  fetchCount,
+  setPullCount,
+  setPushCount,
+  setFetchCount
+}: {
+  remote: Remote;
+  onBack: () => void;
+  onShowConfig: () => void;
+  commits: any[];
+  setChangedFiles: (files: GitStatusFile[]) => void;
+  setStagedFiles: (files: GitStatusFile[]) => void;
+  changedFiles: GitStatusFile[];
+  stagedFiles: GitStatusFile[];
+  commitMsg: string;
+  setCommitMsg: (msg: string) => void;
+  setTab: (tab: 'change' | 'stage' | 'commit') => void;
+  tab: 'change' | 'stage' | 'commit';
+  showStageTab: boolean;
+  setShowStageTab: (show: boolean) => void;
+  fetchChangedFiles: () => void;
+  onDiffFileClick: (file: GitStatusFile, staged?: boolean) => void;
+  selectedFile: GitStatusFile | null;
+  setSelectedFile: (file: GitStatusFile | null) => void;
+  handleCommit: () => void;
+  setIsPushForward: (push: boolean) => void;
+  isPushForward: boolean;
+  selectedBranch: string | null;
+  setSelectedBranch: (branch: string | null) => void;
+  branchList: string[];
+  setBranchList: (branches: string[]) => void;
+  handlePull: () => void;
+  handlePush: () => void;
+  pullCount: number;
+  pushCount: number;
+  fetchCount: number;
+  setPullCount: (count: number) => void;
+  setPushCount: (count: number) => void;
+  setFetchCount: (count: number) => void;
+}) {
   // 펼침/접힘 상태 (브랜치별)
   const [openMap, setOpenMap] = useState<{ [branch: string]: boolean }>(() =>
     Object.fromEntries(branchList.map(b => [b, true]))
@@ -512,26 +520,35 @@ function GitRepository({
           <Settings className="w-4 h-4" /> 깃 설정
         </button>
       </div>
+
       {/* 깃 액션 툴바 */}
       <div className="flex items-center gap-2 px-8 py-5">
-        <button className="flex items-center gap-1 px-3 py-1 rounded bg-[#7a80fc] hover:bg-[#4b2ea7] text-white text-sm font-semibold"
-          onClick={handlePull}
-        >
+        <button className="relative flex items-center gap-1 px-3 py-1 rounded bg-[#7a80fc] hover:bg-[#4b2ea7] text-white text-sm font-semibold" onClick={handlePull}>
           <ArrowDownToLine className="w-4 h-4" /> Pull
+          {pullCount > 0 && (
+            <span className="absolute -top-1 -right-2 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-semibold leading-none text-white bg-red-500 rounded-full">
+              {pullCount}
+            </span>
+          )}
         </button>
-        <button className="flex items-center gap-1 px-3 py-1 rounded bg-[#7a80fc] hover:bg-[#4b2ea7] text-white text-sm font-semibold"
-          onClick={handlePush}
-        >
+        <button className="relative flex items-center gap-1 px-3 py-1 rounded bg-[#7a80fc] hover:bg-[#4b2ea7] text-white text-sm font-semibold" onClick={handlePush}>
           <ArrowUpToLine className="w-4 h-4" /> Push
+          {pushCount > 0 && (
+            <span className="absolute -top-1 -right-2 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-semibold leading-none text-white bg-red-500 rounded-full">
+              {pushCount}
+            </span>
+          )}
         </button>
-        <button
-          className="flex items-center gap-1 px-3 py-1 rounded bg-[#7a80fc] hover:bg-[#4b2ea7] text-white text-sm font-semibold"
-          onClick={() => fetchChangedFiles()}
-        >
+        <button className="relative flex items-center gap-1 px-3 py-1 rounded bg-[#7a80fc] hover:bg-[#4b2ea7] text-white text-sm font-semibold" onClick={() => fetchChangedFiles()}>
           <GitCommit className="w-4 h-4" /> Commit
         </button>
-        <button className="flex items-center gap-1 px-3 py-1 rounded bg-[#7a80fc] hover:bg-[#4b2ea7] text-white text-sm font-semibold">
+        <button className="relative flex items-center gap-1 px-3 py-1 rounded bg-[#7a80fc] hover:bg-[#4b2ea7] text-white text-sm font-semibold">
           <RefreshCcw className="w-4 h-4" /> Fetch
+          {fetchCount > 0 && (
+            <span className="absolute -top-1 -right-2 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-semibold leading-none text-white bg-red-500 rounded-full">
+              {fetchCount}
+            </span>
+          )}
         </button>
         <button className="flex items-center gap-1 px-3 py-1 rounded bg-[#7a80fc] hover:bg-[#4b2ea7] text-white text-sm font-semibold">
           <Boxes className="w-4 h-4" /> Stash
@@ -724,7 +741,13 @@ export default function GitManager() {
     handlePush,
     handleFetch,
     handleStash,
-    handlePopStash
+    handlePopStash,
+    pullCount,
+    pushCount,
+    fetchCount,
+    setPullCount,
+    setPushCount,
+    setFetchCount
   } = useGitManager();
 
   return (
@@ -759,6 +782,12 @@ export default function GitManager() {
             setBranchList={setBranchList}
             handlePull={handlePull}
             handlePush={handlePush}
+            pullCount={pullCount}
+            setPullCount={setPullCount}
+            pushCount={pushCount}
+            setPushCount={setPushCount}
+            fetchCount={fetchCount}
+            setFetchCount={setFetchCount}
           />
         )
         : (

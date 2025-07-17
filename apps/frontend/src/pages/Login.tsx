@@ -14,7 +14,9 @@ const Login = () => {
       <div className="w-[370px] bg-white rounded-2xl shadow-2xl p-10 flex flex-col items-center">
         {/* 로고 */}
         <div className="mb-4">
-          <img src="/logo192.png" alt="logo" className="w-16 h-16 rounded-full shadow-lg" />
+          <span className="w-15 h-15 rounded-full mr-2 flex items-center justify-center text-[2rem] bg-[#e8e5fd] border border-[#b9b3e3] shadow">
+            🛠️
+          </span>
         </div>
         {/* 환영 메시지 */}
         <div className="text-2xl font-bold text-[#6f52e4] mb-2">DevOps Hub</div>

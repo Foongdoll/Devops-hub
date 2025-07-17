@@ -57,7 +57,9 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
 
         {/* 로고/헤더 */}
         <div className="px-6 py-4 flex items-center border-b border-[#4d335d]">
-          <img src="/logo192.png" alt="logo" className="w-8 h-8 rounded-full mr-2" />
+          <span className="w-15 h-15 rounded-full mr-2 flex items-center justify-center text-[2rem] bg-[#e8e5fd] border border-[#b9b3e3] shadow">
+            🛠️
+          </span>
           <span className="font-bold text-xl">DevOps Hub</span>
         </div>
 

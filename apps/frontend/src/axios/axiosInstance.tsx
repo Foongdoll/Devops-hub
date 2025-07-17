@@ -34,7 +34,7 @@ axiosInstance.interceptors.response.use(
 
     return res.data;
   },
-  (err: AxiosError<any>) => {
+  async(err: AxiosError<any>) => {
 
     const apiError: ApiError = {
       success: false,
@@ -45,7 +45,11 @@ axiosInstance.interceptors.response.use(
 
     showToast(apiError.message, 'error');
     // 401(토큰만료) 등 특수 처리 가능
-    if (apiError?.statusCode === 401) localStorage.removeItem('accessToken');
+    if (apiError?.statusCode === 401) {
+      localStorage.removeItem('accessToken');
+      await delay(700);
+      location.href = '/login'; 
+    }
 
     const customError = apiError as ApiError; // 타입 단일화(실패도 ApiResponse)    
     return Promise.reject(customError);

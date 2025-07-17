@@ -47,10 +47,11 @@ export const useGitManager = () => {
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [commits, setCommits] = useState<GitBranchCommits[]>([]);
 
+  const [tab, setTab] = useState<"change" | "stage" | "commit">("change");
 
   // gitrepository 컴포넌트 사용 상태
   const [showStageTab, setShowStageTab] = useState(false);
-  const [tab, setTab] = useState<"change" | "stage" | "commit">("change");
+
   const [changedFiles, setChangedFiles] = useState<GitStatusFile[]>([]);
   const [stagedFiles, setStagedFiles] = useState<GitStatusFile[]>([]);
   const [commitMsg, setCommitMsg] = useState("");
@@ -58,12 +59,22 @@ export const useGitManager = () => {
   const [isPushForward, setIsPushForward] = useState(false);
   const [selectedBranch, setSelectedBranch] = useState<string | null>(null);
   const [branchList, setBranchList] = useState<string[]>([]);
-  // ==============================
   const [showConflictModal, setShowConflictModal] = useState(false);
   const [conflictFiles, setConflictFiles] = useState<string[]>([]);
   const [pullDetails, setPullDetails] = useState<string | null>(null);
+  const [pullCount, setPullCount] = useState<number>(0);
+  const [pushCount, setPushCount] = useState<number>(0);
+  const [fetchCount, setFetchCount] = useState<number>(0);
+  // ==============================
+
 
   useEffect(() => {
+    if (!gitSocket.getSocket().connected && localStorage.getItem('reload') !== "Y") {
+      localStorage.setItem("reload", "Y");
+      location.reload();
+    } else {
+      localStorage.removeItem("reload");
+    }
     const fetchRemotes = async () => {
       const res = await getRemotes();
       if (res) {
@@ -115,6 +126,7 @@ export const useGitManager = () => {
       return;
     }
     setLoading(true);
+
     // 해당 리모트 커밋히스토리 가져오기
     gitSocket.emit('git-all-branches-commits', { repoPath: remote.path, limit: 30 });
 
@@ -130,6 +142,17 @@ export const useGitManager = () => {
       await delay(500);
       hideLoading();
       showToast("브랜치 커밋 정보를 가져오는 데 실패했습니다.", "error");
+    });
+
+    gitSocket.emit('git-counts', { repoPath: remote.path });
+    gitSocket.on('git-counts-data', ({ pullCount, pushCount, fetchCount }) => {
+      setPullCount(pullCount);
+      setPushCount(pushCount);
+      setFetchCount(fetchCount);
+    });
+
+    gitSocket.on('git-counts-error', (error) => {
+      showToast("카운트 정보를 가져오는 데 실패했습니다.", "error");
     });
 
     setSelectedBranch('전체');
@@ -219,7 +242,10 @@ export const useGitManager = () => {
 
   // 깃 풀
   const handlePull = async () => {
-    gitSocket.emit('git-pull', { repoPath: selectedRemote?.path, branch: selectedBranch, strategy: "" });
+
+    console.log(selectedRemote);
+
+    gitSocket.emit('git-pull', { repoPath: selectedRemote?.path, remote: selectedRemote?.name, branch: selectedBranch, strategy: "" });
 
     gitSocket.on('git-pull-success', ({ message }) => showToast(message, "success"));
     gitSocket.on('git-pull-error', ({ message }) => showToast(message, "error"));
@@ -388,6 +414,12 @@ export const useGitManager = () => {
     conflictFiles,
     setConflictFiles,
     pullDetails,
-    setPullDetails
+    setPullDetails,
+    pullCount,
+    setPullCount,
+    pushCount,
+    setPushCount,
+    fetchCount,
+    setFetchCount
   }
 }

@@ -33,9 +33,17 @@ class GitSocket {
     this.gitSocket = io("ws://localhost:3000/git", {
       withCredentials: true,
       transports: ["websocket"],
-      auth: { token: localStorage.getItem('accessToken') }
+      auth: { token: localStorage.getItem('accessToken') },
+      timeout: 15000,
     });
   }
+
+  public connect() {
+    if (!this.gitSocket.connected) {
+      this.gitSocket.connect();
+    }
+  }
+
   public on(event: string, callback: (...args: any[]) => void) {
     this.gitSocket.on(event, callback);
   }
