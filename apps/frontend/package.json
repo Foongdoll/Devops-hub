@@ -1,12 +1,12 @@
 {
   "name": "frontend",
   "private": true,
-  "version": "0.0.0",  
+  "version": "0.0.0",
   "scripts": {
     "dev:react": "vite",
     "dev:ts": "tsc --watch",
     "dev:electron": "electron ./dist-electron/main.js",
-    "dev": "concurrently \"npm:dev:react\" \"npm:dev:ts\" \"npm:dev:electron\"",
+    "dev": "vite",
     "build:electron": "tsc",
     "build:react": "vite build",
     "build": "npm run build:electron && npm run build:react",
@@ -33,6 +33,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.30.1",
+    "@tailwindcss/postcss": "^4.1.11",
     "@tailwindcss/vite": "^4.1.11",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
