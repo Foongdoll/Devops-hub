@@ -442,6 +442,7 @@ export const useGitManager = () => {
     });
   }
 
+  // 푸쉬 모달 제어
   const handleModalPush = async () => {
     if (!pushLocal || !pushRemote) {
       showToast("브랜치를 모두 선택하세요.", "warn");
@@ -454,6 +455,7 @@ export const useGitManager = () => {
     await setShowPushModal(false);
   };
 
+  // 로컬 브랜치 마다 커밋할 파일 목록 조회
   const handleLocalCommitFiles = (branch: string) => {
 
     if (branch === "") {
