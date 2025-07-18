@@ -3,7 +3,7 @@ import {
   Plus, Trash2, Github, ChevronLeft, Settings,
   ArrowDownToLine, ArrowUpToLine, GitCommit, RefreshCcw, Boxes
 } from "lucide-react";
-import { useGitManager, type GitStatusFile, type Remote } from "../customhook/useGitManager";
+import { useGitManager, type GitStatusFile, type PushedFile, type Remote } from "../customhook/useGitManager";
 import { PullConflictModal } from "../components/PullConflictModal";
 
 function classNames(...classes: string[]) {
@@ -22,9 +22,12 @@ function StageTab({
   setSelectedFile,
   setIsPushForward,
   isPushForward,
-  branchList,
   selectedBranch,
   setSelectedBranch,
+  remoteBranches,
+  setRemoteBranches,
+  selectedPushBranch,
+  setSelectedPushBranch
 }: {
   setStagedFiles: (files: GitStatusFile[]) => void,
   setChangedFiles: (files: GitStatusFile[]) => void,
@@ -40,9 +43,12 @@ function StageTab({
   setSelectedFile: (file: GitStatusFile | null) => void;
   setIsPushForward: (push: boolean) => void;
   isPushForward: boolean,
-  branchList: string[],
+  remoteBranches: string[],
   selectedBranch: string | null,
-  setSelectedBranch: (branch: string | null) => void
+  setSelectedBranch: (branch: string | null) => void,
+  setRemoteBranches: (branches: string[]) => void;
+  selectedPushBranch: string | null;
+  setSelectedPushBranch: (branch: string | null) => void;
 }) {
 
   // ✅ 전체 변경 파일 → 스테이지 올리기
@@ -233,9 +239,9 @@ function StageTab({
             <select
               className="px-2 py-1 rounded border border-[#e0e0ef] bg-white text-[#4b2ea7] font-semibold text-sm"
               value={selectedBranch || ""}
-              onChange={e => setSelectedBranch(e.target.value)}
+              onChange={e => setSelectedPushBranch(e.target.value)}
             >
-              {branchList.map(branch => (
+              {remoteBranches.map(branch => (
                 <option key={branch} value={branch}>{branch}</option>
               ))}
             </select>
@@ -428,15 +434,37 @@ function GitRepository({
   isPushForward,
   selectedBranch,
   setSelectedBranch,
-  branchList,  
-  handlePull,
+  
   handlePush,
   pullCount,
   pushCount,
   fetchCount,
   setPullCount,
   setPushCount,
-  setFetchCount
+  setFetchCount,
+  setShowPushModal,
+  showPushModal,
+  pushLocal,
+  setPushLocal,
+  pushRemote,
+  setPushRemote,
+  localBranches,
+  remoteBranches,
+  setRemoteBranches,
+  handleModalPush,
+  pushedFiles,
+  setPushedFiles,
+  handleLocalCommitFiles,
+  selectedPushBranch,
+  setSelectedPushBranch,
+  showPullModal,
+  setShowPullModal,
+  pullLocal,
+  setPullLocal,
+  pullRemote,
+  setPullRemote,  
+  handleModalPull,
+  handleFetch
 }: {
   remote: Remote;
   onBack: () => void;
@@ -460,10 +488,7 @@ function GitRepository({
   setIsPushForward: (push: boolean) => void;
   isPushForward: boolean;
   selectedBranch: string | null;
-  setSelectedBranch: (branch: string | null) => void;
-  branchList: string[];
-  setBranchList: (branches: string[]) => void;
-  handlePull: () => void;
+  setSelectedBranch: (branch: string | null) => void;  
   handlePush: () => void;
   pullCount: number;
   pushCount: number;
@@ -471,15 +496,38 @@ function GitRepository({
   setPullCount: (count: number) => void;
   setPushCount: (count: number) => void;
   setFetchCount: (count: number) => void;
+  setShowPushModal: (show: boolean) => void;
+  showPushModal: boolean;
+  pushLocal: string;
+  setPushLocal: (local: string) => void;
+  pushRemote: string;
+  setPushRemote: (remote: string) => void;
+  localBranches: string[];
+  remoteBranches: string[];
+  setRemoteBranches: (branches: string[]) => void;
+  handleModalPush: () => void;
+  pushedFiles: PushedFile[];
+  setPushedFiles: (files: PushedFile[]) => void;
+  handleLocalCommitFiles: (branch: string) => void;
+  selectedPushBranch: string | null;
+  setSelectedPushBranch: (branch: string | null) => void;
+  showPullModal: boolean;
+  setShowPullModal: (show: boolean) => void;
+  pullLocal: string;
+  setPullLocal: (local: string) => void;
+  pullRemote: string;
+  setPullRemote: (remote: string) => void;  
+  handleModalPull: () => void;  
+  handleFetch: () => void;
 }) {
   // 펼침/접힘 상태 (브랜치별)
   const [openMap, setOpenMap] = useState<{ [branch: string]: boolean }>(() =>
-    Object.fromEntries(branchList.map(b => [b, true]))
+    Object.fromEntries(remoteBranches.map(b => [b, true]))
   );
 
   useEffect(() => {
-    setOpenMap(Object.fromEntries(branchList.map(b => [b, true])));
-  }, [branchList]);
+    setOpenMap(Object.fromEntries(remoteBranches.map(b => [b, true])));
+  }, [remoteBranches]);
 
   // 토글 함수
   const toggleBranch = (branch: string) => {
@@ -523,7 +571,7 @@ function GitRepository({
 
       {/* 깃 액션 툴바 */}
       <div className="flex items-center gap-2 px-8 py-5">
-        <button className="relative flex items-center gap-1 px-3 py-1 rounded bg-[#7a80fc] hover:bg-[#4b2ea7] text-white text-sm font-semibold" onClick={handlePull}>
+        <button className="relative flex items-center gap-1 px-3 py-1 rounded bg-[#7a80fc] hover:bg-[#4b2ea7] text-white text-sm font-semibold" onClick={() => setShowPullModal(true)}>
           <ArrowDownToLine className="w-4 h-4" /> Pull
           {pullCount > 0 && (
             <span className="absolute -top-1 -right-2 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-semibold leading-none text-white bg-red-500 rounded-full">
@@ -531,7 +579,70 @@ function GitRepository({
             </span>
           )}
         </button>
-        <button className="relative flex items-center gap-1 px-3 py-1 rounded bg-[#7a80fc] hover:bg-[#4b2ea7] text-white text-sm font-semibold" onClick={handlePush}>
+        {showPullModal && (
+          <div className="fixed inset-0 flex items-center justify-center bg-black/30 z-[1000] animate-fade-in-up">
+            <div className="bg-white p-6 rounded-xl shadow-2xl min-w-[340px] flex flex-col gap-4 max-h-[80vh] relative">
+              {/* 닫기 버튼 */}
+              <button
+                onClick={() => setShowPullModal(false)}
+                className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 text-xl font-bold"
+                aria-label="닫기"
+              >&times;</button>
+              <div className="font-bold text-lg text-[#4b2ea7]">Pull 브랜치 선택</div>
+
+              {/* 로컬 브랜치 선택 */}
+              <div className="flex flex-col gap-2">
+                <label className="text-sm text-gray-600">로컬 브랜치</label>
+                <select
+                  className="border rounded p-2"
+                  value={pullLocal}
+                  onChange={e => setPullLocal(e.target.value)}
+                >
+                  <option value="">선택하세요</option>
+                  {localBranches.map(b => <option key={b} value={b}>{b}</option>)}
+                </select>
+              </div>              
+
+              {/* 원격 브랜치 선택 */}
+              <div className="flex flex-col gap-2">
+                <label className="text-sm text-gray-600">원격 브랜치</label>
+                <select
+                  className="border rounded p-2"
+                  value={pullRemote}
+                  onChange={e => setPullRemote(e.target.value)}
+                >
+                  <option value="">선택하세요</option>
+                  {remoteBranches.map(b => <option key={b} value={b}>{b}</option>)}
+                </select>
+              </div>
+
+              {/* 애니메이션 */}
+              <style>{`
+        .animate-fade-in-up {
+          animation: fadeInUp 0.23s cubic-bezier(0.39, 0.575, 0.565, 1) both;
+        }
+        @keyframes fadeInUp {
+          0% { opacity: 0; transform: translateY(18px);}
+          100% { opacity: 1; transform: translateY(0);}
+        }
+      `}</style>
+
+              {/* 하단 버튼 */}
+              <div className="flex gap-2 justify-end mt-2">
+                <button
+                  className="px-4 py-1.5 rounded-lg font-semibold bg-gray-100 hover:bg-gray-200 text-gray-700"
+                  onClick={() => setShowPullModal(false)}
+                >취소</button>
+                <button
+                  className="px-4 py-1.5 rounded-lg font-semibold text-white bg-[#7a80fc] hover:bg-[#5630b4]"
+                  onClick={handleModalPull}                  
+                >Pull</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <button className="relative flex items-center gap-1 px-3 py-1 rounded bg-[#7a80fc] hover:bg-[#4b2ea7] text-white text-sm font-semibold" onClick={() => setShowPushModal(true)}>
           <ArrowUpToLine className="w-4 h-4" /> Push
           {pushCount > 0 && (
             <span className="absolute -top-1 -right-2 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-semibold leading-none text-white bg-red-500 rounded-full">
@@ -539,10 +650,130 @@ function GitRepository({
             </span>
           )}
         </button>
+        {showPushModal && (
+          <div className="fixed inset-0 flex items-center justify-center bg-black/30 z-50 animate-fade-in-up">
+            <div className="bg-white p-6 rounded-xl shadow-2xl min-w-[450px] flex flex-col gap-4 max-h-[80vh] relative">
+              {/* 닫기 버튼 */}
+              <button
+                onClick={() => {
+                  setPushedFiles([]);
+                  setShowPushModal(false)
+                }}
+                className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 text-xl font-bold"
+                aria-label="닫기"
+              >&times;</button>
+              {/* 타이틀 */}
+              <div className="font-bold text-lg text-[#4b2ea7]">Push 브랜치 선택</div>
+              {/* 로컬 브랜치 선택 */}
+              <div className="flex flex-col gap-2">
+                <label className="text-sm text-gray-600">로컬 브랜치</label>
+                <select
+                  className="border rounded p-2"
+                  value={pushLocal}
+                  onChange={e => {
+                    setPushLocal(e.target.value);
+                    handleLocalCommitFiles(e.target.value); // 선택 시 파일 목록 로드
+                  }}
+                >
+                  <option value="">선택하세요</option>
+                  {localBranches.map(b => <option key={b} value={b}>{b}</option>)}
+                </select>
+              </div>
+              {/* 원격 브랜치 선택 */}
+              <div className="flex flex-col gap-2">
+                <label className="text-sm text-gray-600">원격 브랜치(저장소)</label>
+                <select
+                  className="border rounded p-2"
+                  value={pushRemote}
+                  onChange={e => setPushRemote(e.target.value)}
+                >
+                  <option value="">선택하세요</option>
+                  {remoteBranches.map(b => <option key={b} value={b}>{b}</option>)}
+                </select>
+              </div>
+              {/* 커밋된 파일 목록 */}
+              <div className="flex flex-col gap-1 mt-3">
+                <div className="font-semibold text-sm text-gray-700 mb-1">
+                  커밋된 파일 목록 <span className="text-[#7a80fc]">{pushedFiles.length}</span>개
+                </div>
+                <div className="max-h-36 overflow-y-auto border rounded bg-gray-50 px-2 py-1 text-xs">
+                  {pushedFiles && pushedFiles.length > 0 ? (
+                    pushedFiles.map((file, idx) => (
+                      <div key={idx} className="flex items-center gap-2 py-0.5 border-b last:border-none">
+                        {/* 상태별 색상 */}
+                        <span
+                          className={
+                            "inline-block w-1.5 h-1.5 rounded-full " +
+                            (file.status === "A"
+                              ? "bg-green-400"
+                              : file.status === "D"
+                                ? "bg-red-400"
+                                : "bg-[#7a80fc]")
+                          }
+                          title={
+                            file.status === "A"
+                              ? "추가됨"
+                              : file.status === "D"
+                                ? "삭제됨"
+                                : "수정됨"
+                          }
+                        />
+                        <span className="truncate flex-1">{file.path}</span>
+                        <span className={
+                          "ml-2 font-bold text-xs " +
+                          (file.status === "A"
+                            ? "text-green-500"
+                            : file.status === "D"
+                              ? "text-red-500"
+                              : "text-blue-500")
+                        }>
+                          {file.status}
+                        </span>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-gray-400 text-xs py-2 text-center">
+                      커밋된 파일이 없습니다.
+                    </div>
+                  )}
+                </div>
+              </div>
+              {/* 애니메이션 */}
+              <style>{`
+        .animate-fade-in-up {
+          animation: fadeInUp 0.23s cubic-bezier(0.39, 0.575, 0.565, 1) both;
+        }
+        @keyframes fadeInUp {
+          0% { opacity: 0; transform: translateY(18px);}
+          100% { opacity: 1; transform: translateY(0);}
+        }
+      `}</style>
+              {/* 하단 버튼 */}
+              <div className="flex gap-2 justify-end mt-2">
+                <button
+                  className="px-4 py-1.5 rounded-lg font-semibold bg-gray-100 hover:bg-gray-200 text-gray-700"
+                  onClick={() => {
+                    setShowPushModal(false);
+                    setPushedFiles([]);
+                  }}
+                >취소</button>
+                <button
+                  className="px-4 py-1.5 rounded-lg font-semibold text-white bg-[#7e4cff] hover:bg-[#5630b4]"
+                  onClick={handleModalPush}
+                  disabled={!pushLocal || !pushRemote}
+                >Push</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+
         <button className="relative flex items-center gap-1 px-3 py-1 rounded bg-[#7a80fc] hover:bg-[#4b2ea7] text-white text-sm font-semibold" onClick={() => fetchChangedFiles()}>
           <GitCommit className="w-4 h-4" /> Commit
         </button>
-        <button className="relative flex items-center gap-1 px-3 py-1 rounded bg-[#7a80fc] hover:bg-[#4b2ea7] text-white text-sm font-semibold">
+        <button className="relative flex items-center gap-1 px-3 py-1 rounded bg-[#7a80fc] hover:bg-[#4b2ea7] text-white text-sm font-semibold"
+          onClick={handleFetch}
+        >
           <RefreshCcw className="w-4 h-4" /> Fetch
           {fetchCount > 0 && (
             <span className="absolute -top-1 -right-2 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-semibold leading-none text-white bg-red-500 rounded-full">
@@ -574,9 +805,12 @@ function GitRepository({
             setSelectedFile={setSelectedFile}
             setIsPushForward={setIsPushForward}
             isPushForward={isPushForward}
-            branchList={branchList}
+            remoteBranches={remoteBranches}
+            setRemoteBranches={setRemoteBranches}
             selectedBranch={selectedBranch}
             setSelectedBranch={setSelectedBranch}
+            selectedPushBranch={selectedPushBranch}
+            setSelectedPushBranch={setSelectedPushBranch}
           />
         ) : (
           <div className="flex flex-col relative px-8 py-8 bg-[#f8f6fc] min-h-[80vh]">
@@ -593,7 +827,7 @@ function GitRepository({
               >
                 전체
               </button>
-              {branchList.map(branch => (
+              {remoteBranches.map(branch => (
                 <button
                   key={branch}
                   className={`px-3 py-1 rounded text-sm font-semibold border ${selectedBranch === branch
@@ -729,9 +963,7 @@ export default function GitManager() {
     isPushForward,
     selectedBranch,
     setSelectedBranch,
-    branchList,
-    setBranchList,
-    handlePull,
+    
     conflictFiles,
     showConflictModal,
     setShowConflictModal,
@@ -747,7 +979,24 @@ export default function GitManager() {
     fetchCount,
     setPullCount,
     setPushCount,
-    setFetchCount
+    setFetchCount,
+    showPushModal,
+    setShowPushModal,
+    pushLocal,
+    setPushLocal,
+    pushRemote,
+    setPushRemote,
+    localBranches,
+    remoteBranches,
+    setRemoteBranches,
+    handleModalPush,
+    pushedFiles, setPushedFiles,
+    handleLocalCommitFiles,
+    selectedPushBranch, setSelectedPushBranch,
+    showPullModal, setShowPullModal,
+    pullLocal, setPullLocal,
+    pullRemote, setPullRemote,    
+    handleModalPull
   } = useGitManager();
 
   return (
@@ -777,10 +1026,7 @@ export default function GitManager() {
             setIsPushForward={setIsPushForward}
             isPushForward={isPushForward}
             selectedBranch={selectedBranch}
-            setSelectedBranch={setSelectedBranch}
-            branchList={branchList}
-            setBranchList={setBranchList}
-            handlePull={handlePull}
+            setSelectedBranch={setSelectedBranch}            
             handlePush={handlePush}
             pullCount={pullCount}
             setPullCount={setPullCount}
@@ -788,6 +1034,29 @@ export default function GitManager() {
             setPushCount={setPushCount}
             fetchCount={fetchCount}
             setFetchCount={setFetchCount}
+            pushLocal={pushLocal}
+            setPushLocal={setPushLocal}
+            pushRemote={pushRemote}
+            setPushRemote={setPushRemote}
+            localBranches={localBranches}
+            remoteBranches={remoteBranches}
+            setRemoteBranches={setRemoteBranches}
+            handleModalPush={handleModalPush}
+            showPushModal={showPushModal}
+            setShowPushModal={setShowPushModal}
+            pushedFiles={pushedFiles}
+            setPushedFiles={setPushedFiles}
+            handleLocalCommitFiles={handleLocalCommitFiles}
+            selectedPushBranch={selectedPushBranch}
+            setSelectedPushBranch={setSelectedPushBranch}
+            showPullModal={showPullModal}
+            setShowPullModal={setShowPullModal}
+            pullLocal={pullLocal}
+            setPullLocal={setPullLocal}
+            pullRemote={pullRemote}
+            setPullRemote={setPullRemote}            
+            handleModalPull={handleModalPull}            
+            handleFetch={handleFetch}
           />
         )
         : (

@@ -47,6 +47,14 @@ class GitSocket {
   public on(event: string, callback: (...args: any[]) => void) {
     this.gitSocket.on(event, callback);
   }
+
+  public off(event: string, callback?: (...args: any[]) => void) {
+    if (callback) {
+      this.gitSocket.off(event, callback);
+    } else {
+      this.gitSocket.off(event);
+    }
+  }
   public emit(event: string, data: any) {
     this.gitSocket.emit(event, data);
   }
