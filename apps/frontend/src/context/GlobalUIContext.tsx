@@ -7,6 +7,8 @@ interface ConfirmOptions {
   confirmText?: string;
   cancelText?: string;
   danger?: boolean;
+  select?: boolean;
+  data?: any;
 }
 
 interface GlobalUIContextProps {
@@ -15,7 +17,7 @@ interface GlobalUIContextProps {
   error: string | null;
   setError: (msg: string | null) => void;
   showToast: (message: string, type: 'success' | 'error' | 'info' | 'warn') => void;
-  showConfirm: (message: string, description?: string, options?: ConfirmOptions) => Promise<boolean>;
+  showConfirm: (message: string, description?: string, options?: ConfirmOptions) => Promise<[boolean, any?]>;
 }
 
 const GlobalUIContext = createContext<GlobalUIContextProps | undefined>(undefined);
@@ -36,8 +38,9 @@ export function GlobalUIProvider({ children }: { children: ReactNode }) {
     message: string;
     description?: string;
     options?: ConfirmOptions;
-    resolve?: (result: boolean) => void;
+    resolve?: (value: [boolean, any]) => void;
   }>({ open: false, message: "" });
+  const [data, setData] = useState<any>(null);
 
   // 여기서 구독해서 notifyStore의 showToast 호출을 실제로 "받아" 처리합니다.
   useEffect(() => {
@@ -53,7 +56,7 @@ export function GlobalUIProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const showConfirm = (message: string, description?: string, options?: ConfirmOptions) => {
-    return new Promise<boolean>(resolve => {
+    return new Promise<[boolean, any]>(resolve => {
       setConfirmState({
         open: true, message, description, options,
         resolve
@@ -62,9 +65,15 @@ export function GlobalUIProvider({ children }: { children: ReactNode }) {
   };
 
   const handleConfirm = (result: boolean) => {
-    confirmState.resolve?.(result);
+    if (result) {
+      confirmState.resolve?.([true, data]);
+    } else {
+      confirmState.resolve?.([false, undefined]);
+    }
+    setData(null);
     setConfirmState({ open: false, message: "" });
   };
+
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' | 'warn') => {
     setToast({ message, type });
@@ -82,7 +91,7 @@ export function GlobalUIProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <GlobalUIContext.Provider value={{ loading, setLoading, error, setError, showToast }}>
+    <GlobalUIContext.Provider value={{ loading, setLoading, error, setError, showToast, showConfirm }}>
       {children}
 
       {/* Loading Overlay (가운데, 투명 배경, 모던) */}
@@ -103,29 +112,67 @@ export function GlobalUIProvider({ children }: { children: ReactNode }) {
           </div>
         )}
         {toast && (
-          <div className={
-            `max-w-xs w-full bg-white shadow-lg rounded-lg px-5 py-3 text-sm flex items-center gap-2 font-semibold border-l-4 animate-fade-in-up ` +
-            (toast.type === 'success' ? 'border-green-400 text-green-700'
-              : toast.type === 'error' ? 'border-red-400 text-red-700'
-                : toast.type === 'warn' ? 'border-yellow-400 text-yellow-700'
-                  : 'border-blue-400 text-blue-700')
-          }>
-            <span className={
-              (toast.type === 'success' ? 'text-green-500'
-                : toast.type === 'error' ? 'text-red-500'
-                  : toast.type === 'warn' ? 'text-yellow-500'
-                    : 'text-blue-500') +
-              " text-xl"
-            }>•</span>
-            <span className="flex-1">{toast.message}</span>
+          <div className="fixed inset-0 z-[1000] flex items-end justify-center pointer-events-none mb-24">
+            <div
+              className={
+                `max-w-xs w-full bg-white shadow-lg rounded-lg px-5 py-3 text-sm flex items-center gap-2 font-semibold border-l-4 animate-toast-in-out ` +
+                (toast.type === 'success' ? 'border-green-400 text-green-700'
+                  : toast.type === 'error' ? 'border-red-400 text-red-700'
+                    : toast.type === 'warn' ? 'border-yellow-400 text-yellow-700'
+                      : 'border-blue-400 text-blue-700')
+              }
+              style={{
+                pointerEvents: 'auto',
+                minWidth: '280px'
+              }}
+            >
+              <span className={
+                (toast.type === 'success' ? 'text-green-500'
+                  : toast.type === 'error' ? 'text-red-500'
+                    : toast.type === 'warn' ? 'text-yellow-500'
+                      : 'text-blue-500') +
+                " text-xl"
+              }>•</span>
+              <span className="flex-1">{toast.message}</span>
+            </div>
+            {/* 애니메이션 스타일 */}
+            <style>
+              {`
+        .animate-toast-in-out {
+          animation: toastFadeIn 0.35s cubic-bezier(0.39, 0.575, 0.565, 1) both, 
+                     toastFadeOut 0.35s cubic-bezier(0.39, 0.575, 0.565, 1) 2.65s forwards;
+        }
+        @keyframes toastFadeIn {
+          from { opacity: 0; transform: translateY(24px) scale(0.98);}
+          to   { opacity: 1; transform: translateY(0) scale(1);}
+        }
+        @keyframes toastFadeOut {
+          from { opacity: 1; transform: translateY(0) scale(1);}
+          to   { opacity: 0; transform: translateY(-10px) scale(0.98);}
+        }
+      `}
+            </style>
           </div>
         )}
+
+
         {confirmState.open && (
           <div className="fixed inset-0 z-[1000] bg-black/30 flex items-center justify-center">
             <div className="bg-white rounded-2xl p-8 min-w-[320px] max-w-xs shadow-xl border border-[#e0e0f0] flex flex-col gap-4 animate-fade-in-up">
               <div className="font-bold text-lg text-[#4b2ea7]">{confirmState.message}</div>
               {confirmState.description && (
                 <div className="text-gray-500 text-sm">{confirmState.description}</div>
+              )}
+              {confirmState.options?.select && (
+                <select
+                  className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm"
+                  onChange={(e) => setData(e.target.value)}
+                >
+                  <option value="">선택하세요</option>
+                  {confirmState.options.data?.map((item: any, index: number) => (
+                    <option key={index} value={item}>{item}</option>
+                  ))}
+                </select>
               )}
               <div className="flex gap-2 mt-2 justify-end">
                 <button
@@ -136,8 +183,8 @@ export function GlobalUIProvider({ children }: { children: ReactNode }) {
                 </button>
                 <button
                   className={`px-4 py-1.5 rounded-lg font-semibold text-white ${confirmState.options?.danger
-                      ? "bg-red-500 hover:bg-red-700"
-                      : "bg-[#7e4cff] hover:bg-[#5630b4]"
+                    ? "bg-red-500 hover:bg-red-700"
+                    : "bg-[#7e4cff] hover:bg-[#5630b4]"
                     }`}
                   onClick={() => handleConfirm(true)}
                 >
