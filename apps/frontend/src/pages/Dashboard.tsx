@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { FolderOpen, GitBranch, Cloud, Lock } from "lucide-react"; // 아이콘 라이브러리
+import { FolderOpen, GitBranch, Cloud, Lock } from "lucide-react";
 import { useEffect } from "react";
 
 const sshServers = [
@@ -18,22 +18,25 @@ const Dashboard = () => {
   }, []);
 
   return (
-    <div className="p-10 space-y-8 bg-gray-50 min-h-screen">
+    <div className="p-10 space-y-8 bg-background-light dark:bg-background-dark min-h-screen transition-colors duration-300">
       {/* SSH/FTP/SFTP 서버 패널 */}
       <div>
-        <div className="text-xl font-bold mb-3 flex items-center">
+        <div className="text-xl font-bold mb-3 flex items-center text-black dark:text-white">
           <Lock className="w-5 h-5 mr-2 text-[#6f52e4]" />
           서버 접속 관리
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           {sshServers.map((srv) => (
             <div key={srv.id}
-              className="flex items-center bg-white rounded-xl p-5 shadow hover:shadow-md transition group"
+              className="flex items-center bg-panel-light dark:bg-panel-dark rounded-xl p-5 shadow hover:shadow-md transition group"
             >
               <Cloud className="w-8 h-8 mr-4 text-blue-400" />
               <div className="flex-1">
-                <div className="font-bold text-lg">{srv.name} <span className="text-xs text-gray-400 ml-2">{srv.type}</span></div>
-                <div className="text-gray-600">{srv.user}@{srv.host}</div>
+                <div className="font-bold text-lg text-black dark:text-white">
+                  {srv.name}
+                  <span className="text-xs text-gray-400 ml-2">{srv.type}</span>
+                </div>
+                <div className="text-gray-600 dark:text-gray-300">{srv.user}@{srv.host}</div>
                 <div className={`text-xs font-semibold mt-1 ${srv.status === 'online' ? 'text-green-500' : 'text-red-400'}`}>
                   {srv.status === 'online' ? "접속 가능" : "접속 불가"}
                 </div>
@@ -50,24 +53,24 @@ const Dashboard = () => {
 
       {/* 깃 저장소/브랜치 패널 */}
       <div>
-        <div className="text-xl font-bold mb-3 flex items-center">
+        <div className="text-xl font-bold mb-3 flex items-center text-black dark:text-white">
           <GitBranch className="w-5 h-5 mr-2 text-green-600" />
           Git 저장소 관리
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           {gitRepos.map((repo) => (
             <div key={repo.id}
-              className="flex items-center bg-white rounded-xl p-5 shadow hover:shadow-md transition group"
+              className="flex items-center bg-panel-light dark:bg-panel-dark rounded-xl p-5 shadow hover:shadow-md transition group"
             >
               <FolderOpen className="w-8 h-8 mr-4 text-orange-400" />
               <div className="flex-1">
-                <div className="font-bold text-lg">{repo.name}</div>
-                <div className="text-gray-600 text-sm flex items-center">
-                  브랜치 <span className="ml-2 mr-1 px-2 py-0.5 bg-gray-200 rounded">{repo.branch}</span>
+                <div className="font-bold text-lg text-black dark:text-white">{repo.name}</div>
+                <div className="text-gray-600 dark:text-gray-300 text-sm flex items-center">
+                  브랜치 <span className="ml-2 mr-1 px-2 py-0.5 bg-gray-200 dark:bg-[#322446] dark:text-[#bba7ee] rounded">{repo.branch}</span>
                   <span className="mx-2">|</span>
                   커밋 <span className="ml-1 font-bold">{repo.commits}</span>
                 </div>
-                <div className="text-gray-400 text-xs mt-1">
+                <div className="text-gray-400 dark:text-gray-500 text-xs mt-1">
                   Remote: {repo.remote}
                   <a
                     href={repo.url}

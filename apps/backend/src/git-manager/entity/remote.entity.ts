@@ -14,4 +14,7 @@ export class Remote {
 
   @Column()
   path: string;
+  
+  @Column()
+  userCd: string;
 }

@@ -5,7 +5,17 @@ module.exports = {
     "./src/**/*.{js,ts,jsx,tsx}", // React 등 소스
   ],
   theme: {
-    extend: {},
+    extend: {
+      colors: {
+        'background-light': "#faf8ff",
+        'background-dark': "#322446",
+        'panel-light': "#fff",
+        'panel-dark': "#22173b",
+        'accent-light': "#7c3aed",
+        'accent-dark': "#bba7ee",
+      }
+    }
   },
   plugins: [],
+  darkMode: 'class',
 }

@@ -1,28 +1,40 @@
-import { apiRequest } from "../axios/axiosInstance";
-import type { Remote } from "../customhook/useGitManager";
 import { io, Socket } from "socket.io-client";
+import { apiRequest } from "../axios/axiosInstance";
+import type { Remote } from "../customhook/git/useRemote";
 
-export const addRemote = async (remote: { name: string; url: string; path: string }) => {
-  return await apiRequest<Remote>({
-    url: "git-manager/addRemote",
-    method: "POST",
+// Remote Fetch
+export async function fetchRemotesImpl(): Promise<Remote[]> {
+  return apiRequest<Remote[]>({
+    url: 'git-manager/getRemotes',
+    method: 'GET',
+  });
+}
+
+// Remote Add
+export async function addRemoteImpl(remote: Remote): Promise<Remote> {
+  return apiRequest<Remote>({
+    url: 'git-manager/addRemote',
+    method: 'POST',
     data: remote,
   });
-};
+}
+// Remote Edit
+export async function editRemoteImpl(remote: Remote): Promise<Remote> {
+  return apiRequest<Remote>({
+    url: 'git-manager/editRemote',
+    method: 'PUT',
+    data: remote
+  })
+}
 
-export const getRemotes = async (): Promise<Remote[]> => {
-  return await apiRequest<Remote[]>({
-    url: "git-manager/getRemotes",
-    method: "GET",
+// Remote Delete
+export async function deleteRemoteImpl(remote: Remote): Promise<void> {    
+  return apiRequest<void>({
+    url: `git-manager/deleteRemote`,
+    method: 'POST',
+    data: { id: remote.id }
   });
-};
-
-export const deleteRemote = async (id: string): Promise<Remote> => {
-  return await apiRequest<Remote>({
-    url: `git-manager/deleteRemote/${id}`,
-    method: "DELETE",
-  });
-};
+}
 
 
 // gitSocket.ts (싱글턴)

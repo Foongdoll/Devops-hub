@@ -11,6 +11,7 @@ import {
   Cloud,
   Settings,
 } from 'lucide-react';
+import { useTheme } from '../context/ThemeProvider';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -28,7 +29,7 @@ const mainMenus = [
 
 const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const { pathname } = useLocation();
-
+  const { theme, toggleTheme } = useTheme();
   return (
     <>
       {/* 모바일 오버레이 */}
@@ -60,7 +61,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           <span className="w-15 h-15 rounded-full mr-2 flex items-center justify-center text-[2rem] bg-[#e8e5fd] border border-[#b9b3e3] shadow">
             🛠️
           </span>
-          <span className="font-bold text-xl">DevOps Hub</span>
+          <span className="font-bold text-xl">DevOps Hub</span>          
         </div>
 
         {/* 메뉴 리스트 */}
