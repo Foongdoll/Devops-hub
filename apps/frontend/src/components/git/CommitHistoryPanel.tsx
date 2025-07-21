@@ -26,6 +26,8 @@ export const CommitHistoryPanel: React.FC<CommitHistoryPanelProps> = ({
   closeContextMenu,
   handleMenuAction,
 }) => {
+  
+
   return (
     <section className="bg-gray-900 p-4 rounded-2xl shadow flex flex-col gap-1 overflow-y-auto h-full">
       {commits.map((commit) => (

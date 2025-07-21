@@ -50,5 +50,11 @@ export function useRemotes(initial: Remote[] = []) {
     }
   }, []);
 
-  return { remotes, addRemote, editRemote, removeRemote, setRemotes, selectedRemote, setSelectedRemote };
+  const selectRemote = useCallback(async (remote: Remote): Promise<boolean> => {
+    setSelectedRemote(remote);
+    return true;
+  }, []);
+
+
+  return { remotes, addRemote, editRemote, removeRemote, setRemotes, selectedRemote, setSelectedRemote, selectRemote };
 }

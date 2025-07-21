@@ -1,4 +1,3 @@
-import { useState } from "react";
 import TopActionBar from "../components/git/TopActionBar";
 import TabNav from "../components/git/TabNav";
 import RemotesPanel from "../components/git/RemotesPanel";
@@ -7,7 +6,6 @@ import BranchesPanel from "../components/git/BranchsPanel";
 import StashPanel from "../components/git/StashPanel";
 import { useGitManager } from "../customhook/useGitManager";
 import { CommitHistoryPanel } from "../components/git/CommitHistoryPanel";
-import { useCommitHistory } from "../customhook/git/useCommitHistory";
 
 const GitManager = () => {
   const git = useGitManager(); // 커스텀 훅에서 전부 가져오기
@@ -41,6 +39,8 @@ const GitManager = () => {
             onAdd={git.addRemote}
             onEdit={git.editRemote}
             onRemove={git.removeRemote}
+            onChange={git.setTab}
+            onSelect={git.selectRemote}
           />
         )}
         {git.tab === "changes" && (

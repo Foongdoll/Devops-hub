@@ -6,6 +6,8 @@ import { useTopActionBar } from '../customhook/git/useTopActionBar';
 import { useState } from 'react';
 import { useCommitHistory } from './git/useCommitHistory';
 
+export type tabType = 'history' | 'remotes' | 'changes' | 'branches' | 'stash';
+
 export const useGitManager = () => {
   const remotes = useRemotes();
   const changes = useChanges();
@@ -15,11 +17,8 @@ export const useGitManager = () => {
   const commitHistory = useCommitHistory([
     { hash: "abcd1234", message: "feat: 최초 커밋", author: "신현우", date: "2025-07-20", branches: ["main"] },
   ]);
-  
 
-
-
-  const [tab, setTab] = useState<'history' | 'remotes' | 'changes' | 'branches' | 'stash'>('remotes');  
+  const [tab, setTab] = useState<tabType>('remotes');
 
   return {
     tab, setTab,
@@ -31,3 +30,4 @@ export const useGitManager = () => {
     ...commitHistory,
   };
 };
+ 

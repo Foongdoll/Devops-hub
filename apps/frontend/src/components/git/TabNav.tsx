@@ -1,5 +1,6 @@
 import { Cloud, List, GitBranch, Inbox, History } from 'lucide-react';
-import type { Remote } from './RemotesPanel';
+import { showToast } from '../../utils/notifyStore';
+import type { Remote } from '../../customhook/git/useRemote';
 
 const tabs = [
   { key: 'remotes', icon: <Cloud />, label: 'Remotes' },
@@ -31,6 +32,8 @@ const TabNav: React.FC<TabNavProps> = ({ active, onChange, children, selectedRem
               // 리모트가 선택되어 있을 때만 탭 변경
               if (selectedRemote) {
                 onChange(tab.key as any);
+              } else {
+                showToast('먼저 리모트를 선택해주세요.', 'warn');
               }
             }}
           >

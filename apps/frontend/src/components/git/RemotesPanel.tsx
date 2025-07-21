@@ -2,16 +2,18 @@ import { useEffect, useState } from 'react';
 import { Pencil, Trash2, Plus, FolderOpen } from 'lucide-react';
 import { showToast } from '../../utils/notifyStore';
 import type { Remote } from '../../customhook/git/useRemote';
-import { fetchRemotesImpl } from '../../services/GitManagerService';
+import type { tabType } from '../../customhook/useGitManager';
 
 export interface RemotesPanelProps {
   remotes: Remote[];
   onAdd: (remote: Remote) => void;
   onEdit: (remote: Remote) => void;
   onRemove: (remote: Remote) => void;
+  onChange: (tab: tabType) => void;
+  onSelect: (remote: Remote) => Promise<boolean>;
 }
 
-const RemotesPanel: React.FC<RemotesPanelProps> = ({ remotes, onAdd, onEdit, onRemove }) => {
+const RemotesPanel: React.FC<RemotesPanelProps> = ({ remotes, onAdd, onEdit, onRemove, onChange, onSelect }) => {
   
   const [showForm, setShowForm] = useState(false);
   const [editRemote, setEditRemote] = useState<Remote | null>(null);
@@ -115,7 +117,15 @@ const RemotesPanel: React.FC<RemotesPanelProps> = ({ remotes, onAdd, onEdit, onR
 
       <ul className="space-y-2">
         {remotes.map(r => (
-          <li key={r.id} className="flex items-center justify-between bg-gray-800 rounded-xl px-4 py-3 group transition shadow-sm">
+          <li key={r.id} className="flex items-center justify-between bg-gray-800 rounded-xl px-4 py-3 group transition shadow-sm cursor-pointer hover:bg-gray-700"
+            onClick={() => {
+              onSelect(r).then(selected => {
+                if (selected) {
+                  onChange('history'); // 선택된 원격 저장소로 변경
+                }
+              });
+            }}
+          >
             <div>
               <div className="font-semibold text-gray-100">{r.name}</div>
               <div className="text-gray-400 text-xs">{r.url}</div>
