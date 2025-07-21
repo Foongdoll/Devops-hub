@@ -11,13 +11,14 @@ export interface RemotesPanelProps {
   onRemove: (remote: Remote) => void;
   onChange: (tab: tabType) => void;
   onSelect: (remote: Remote) => Promise<boolean>;
+  onBranchSelect: (remote: Remote) => Promise<boolean>;
 }
 
-const RemotesPanel: React.FC<RemotesPanelProps> = ({ remotes, onAdd, onEdit, onRemove, onChange, onSelect }) => {
-  
+const RemotesPanel: React.FC<RemotesPanelProps> = ({ remotes, onAdd, onEdit, onRemove, onChange, onSelect, onBranchSelect }) => {
+
   const [showForm, setShowForm] = useState(false);
   const [editRemote, setEditRemote] = useState<Remote | null>(null);
-  const [form, setForm] = useState<Remote>({ id: '', name: '', url: '', path: '' });  
+  const [form, setForm] = useState<Remote>({ id: '', name: '', url: '', path: '' });
 
   // 폴더 선택 다이얼로그 (웹 환경에선 input[file webkitdirectory], 데스크탑/Electron에선 dialog 연동)
   const handleBrowseFolder = async () => {
@@ -40,7 +41,7 @@ const RemotesPanel: React.FC<RemotesPanelProps> = ({ remotes, onAdd, onEdit, onR
     setEditRemote(null);
     setForm({ id: '', name: '', url: '', path: '' });
   };
-  
+
 
   return (
     <section className="max-w-xl mx-auto py-6">
@@ -118,21 +119,23 @@ const RemotesPanel: React.FC<RemotesPanelProps> = ({ remotes, onAdd, onEdit, onR
       <ul className="space-y-2">
         {remotes.map(r => (
           <li key={r.id} className="flex items-center justify-between bg-gray-800 rounded-xl px-4 py-3 group transition shadow-sm cursor-pointer hover:bg-gray-700"
-            onClick={() => {
-              onSelect(r).then(selected => {
-                if (selected) {
+            onClick={async () => {
+              const selected = await onSelect(r);
+              if (selected) {
+                const result = await onBranchSelect(r);
+                if (result) {
                   onChange('history'); // 선택된 원격 저장소로 변경
                 }
-              });
+              }
             }}
-          >
+          >                            
             <div>
               <div className="font-semibold text-gray-100">{r.name}</div>
               <div className="text-gray-400 text-xs">{r.url}</div>
               <div className="text-gray-400 text-xs">{r.path}</div>
             </div>
             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition">
-              <button
+              {/* <button
                 onClick={() => {
                   setShowForm(true);
                   setEditRemote(r);
@@ -142,7 +145,7 @@ const RemotesPanel: React.FC<RemotesPanelProps> = ({ remotes, onAdd, onEdit, onR
                 title="수정"
               >
                 <Pencil className="w-4 h-4 text-gray-300 hover:text-blue-400" />
-              </button>
+              </button> */}
               <button
                 onClick={() => onRemove(r)}
                 className="p-2 rounded-full hover:bg-gray-700"

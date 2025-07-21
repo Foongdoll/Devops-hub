@@ -25,12 +25,14 @@ const GitManager = () => {
       <main className="flex-1 overflow-y-auto">
         {git.tab === "history" && (
           <CommitHistoryPanel
-            commits={git.commits}
+            commits={git.commits}            
+            commitsWithBranches={git.commitsWithBranches}
             onContextMenu={git.openContextMenu}
             selectedHash={git.selectedHash}
             selectCommit={git.selectCommit}
             closeContextMenu={git.closeContextMenu}
-            handleMenuAction={git.handleMenuAction}
+            handleMenuAction={git.handleMenuAction}            
+            commitBranches={git.commitBranches}            
           />
         )}
         {git.tab === "remotes" && (
@@ -41,6 +43,7 @@ const GitManager = () => {
             onRemove={git.removeRemote}
             onChange={git.setTab}
             onSelect={git.selectRemote}
+            onBranchSelect={git.fetchBranches}
           />
         )}
         {git.tab === "changes" && (

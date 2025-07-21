@@ -13,9 +13,10 @@ import { Inject, Logger, UseGuards } from '@nestjs/common';
 import { promisify } from 'util';
 import { exec, execFile } from 'child_process';
 import { JwtTokenService } from 'src/auth/jwt.service';
-import path from 'path';
-const execAsync = promisify(exec);
+import { fetch_commit_history } from 'src/common/type/git.interface';
+import { Remote } from './entity/remote.entity';
 const execFileAsync = promisify(execFile);
+
 
 @WebSocketGateway({
   namespace: '/git', // ★★★ "/git" 네임스페이스(중요)
@@ -58,6 +59,54 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
     this.logger.log(`Git 소켓 연결 해제: ${sock.id}`);
     this.gitClients.delete(sock.id);
   }
+
+
+  /**
+    * 커밋 히스토리 요청 처리
+    * @param data Remote 
+  */
+  @SubscribeMessage('fetch_commit_history')
+  async handleFetchCommitHistory(
+    @MessageBody() remote: Remote,
+    @ConnectedSocket() socket: Socket
+  ) {
+
+    try {      
+      // Git 명령어 실행
+      const { stdout: history, stderr } = await execFileAsync("git", [
+        "-C", remote.path,
+        "log",
+        "--pretty=format:{\"hash\":\"%H\",\"parents\":\"%P\",\"message\":\"%s\",\"author\":\"%an\",\"date\":\"%ad\",\"refs\":\"%D\"}",
+        "--date=iso"
+      ]);
+
+      if (stderr) {
+        this.logger.error(`Git log error: ${stderr}`);
+        socket.emit('fetch_commit_history_response', []);
+        return;
+      }      
+      // JSON 파싱
+      const commits = history.split('\n').map(line => JSON.parse(line)) as fetch_commit_history[];
+
+      socket.emit('fetch_commit_history_response', commits);
+    } catch (error) {
+      this.logger.error(`Git log command failed: ${error.message}`);
+      socket.emit('fetch_commit_history_response', []);
+    }
+
+
+  }
+
+
+
+
+
+
+
+
+
+
+
 
 
 }

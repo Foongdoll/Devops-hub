@@ -1,6 +1,7 @@
 import { io, Socket } from "socket.io-client";
 import { apiRequest } from "../axios/axiosInstance";
 import type { Remote } from "../customhook/git/useRemote";
+import type { Branch, TrackingBranch } from "../customhook/git/useBranches";
 
 // Remote Fetch
 export async function fetchRemotesImpl(): Promise<Remote[]> {
@@ -28,7 +29,7 @@ export async function editRemoteImpl(remote: Remote): Promise<Remote> {
 }
 
 // Remote Delete
-export async function deleteRemoteImpl(remote: Remote): Promise<void> {    
+export async function deleteRemoteImpl(remote: Remote): Promise<void> {
   return apiRequest<void>({
     url: `git-manager/deleteRemote`,
     method: 'POST',
@@ -36,47 +37,86 @@ export async function deleteRemoteImpl(remote: Remote): Promise<void> {
   });
 }
 
+// Branch Fetch
+export async function fetchBranchesImpl(remote: Remote): Promise<{ local: Branch[], remote: Branch[], tracking: TrackingBranch[] }> {
+  return apiRequest<{ local: Branch[], remote: Branch[], tracking: TrackingBranch[] }>({
+    url: 'git-manager/fetchBranches',
+    method: 'POST',
+    data: { remote }
+  });
+}
 
-// gitSocket.ts (싱글턴)
-// 한 번만 인스턴스를 만든다!
-class GitSocket {
-  private gitSocket: Socket;
-  constructor() {
-    this.gitSocket = io("ws://localhost:3000/git", {
-      withCredentials: true,
-      transports: ["websocket"],
-      auth: { token: localStorage.getItem('accessToken') },
-      timeout: 15000,
+
+class GitService {
+  private socket: Socket | null = null;
+  private reconnectAttempts = 0;
+  private maxReconnectAttempts = 5;
+
+  connect() {
+    if (this.socket && this.socket.connected) {
+      return this.socket;
+    }
+
+    this.socket = io('ws://localhost:3000/git', {
+      transports: ['websocket', 'polling'],
+      timeout: 20000,
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+      auth: { token: localStorage.getItem('accessToken') }
     });
+
+    this.socket.on('connect', () => {
+      console.log('Socket connected:', this.socket?.id);
+      this.reconnectAttempts = 0;
+    });
+
+    this.socket.on('disconnect', (reason) => {
+      console.log('Socket disconnected:', reason);
+    });
+
+    this.socket.on('connect_error', (error) => {
+      console.error('Socket connection error:', error);
+      this.reconnectAttempts++;
+
+      if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+        console.error('Max reconnection attempts reached');
+      }
+    });
+
+    return this.socket;
   }
 
-  public connect() {
-    if (!this.gitSocket.connected) {
-      this.gitSocket.connect();
+  disconnect() {
+    if (this.socket) {
+      this.socket.disconnect();
+      this.socket = null;
     }
   }
 
-  public on(event: string, callback: (...args: any[]) => void) {
-    this.gitSocket.on(event, callback);
+  getSocket(): Socket | null {
+    return this.socket;
   }
 
-  public off(event: string, callback?: (...args: any[]) => void) {
-    if (callback) {
-      this.gitSocket.off(event, callback);
+  emit(event: string, data?: any) {
+    if (this.socket) {
+      this.socket.emit(event, data);
     } else {
-      this.gitSocket.off(event);
+      console.warn('Socket not connected');
     }
   }
-  public emit(event: string, data: any) {
-    this.gitSocket.emit(event, data);
+
+  on(event: string, callback: (...args: any[]) => void) {
+    if (this.socket) {
+      this.socket.on(event, callback);
+    }
   }
-  public disconnect() {
-    this.gitSocket.disconnect();
-  }
-  public getSocket(): Socket {
-    return this.gitSocket;
+
+  off(event: string, callback?: (...args: any[]) => void) {
+    if (this.socket) {
+      this.socket.off(event, callback);
+    }
   }
 }
 
-// 딱 한 번 생성해서 export!
-export const gitSocket = new GitSocket();
+export const gitService = new GitService();
