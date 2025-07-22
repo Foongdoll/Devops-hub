@@ -2,33 +2,35 @@ import { useState, useCallback, useEffect } from 'react';
 import type { Remote } from './useRemote';
 import { fetchBranchesImpl } from '../../services/GitManagerService';
 import { useRemoteContext } from '../../context/RemoteContext';
-import { useGlobalUI } from '../../context/GlobalUIContext';
 import { useGitSocket } from '../../context/GitSocketContext';
 import { showToast } from '../../utils/notifyStore';
 export type Branch = { name: string; current?: boolean; fullname?: string };
 export type TrackingBranch = { local: string; remote: string; ahead?: number; behind?: number };
 
 export function useBranches() {
-  const { setLocalBranches, setRemoteBranches, setSelectedLocalBranch, setSelectedRemoteBranch } = useRemoteContext();  
+  const { setLocalBranches, setRemoteBranches, setSelectedLocalBranch, setSelectedRemoteBranch } = useRemoteContext();
   const { emit, on, off } = useGitSocket();
-  const { selectedRemote } = useRemoteContext();
   const fetchBranches = useCallback(async (remote: Remote) => {
     const result = await fetchBranchesImpl(remote) as { local: Branch[], remote: Branch[], tracking: TrackingBranch[] };
     if (!result) return false;
 
+
+
     setLocalBranches(result.local);
     setRemoteBranches(result.remote);
-    setSelectedLocalBranch(result.local.find(b => b.current)?.name || '');    
+    setSelectedLocalBranch(result.local.find(b => b.current)?.name || '');
     setSelectedRemoteBranch(result.remote.find(b => b.current)?.name || '');
-    
+    emit('connect_git', { remote: remote })
+    emit('fetch_pull_request_count', { remote: remote, remoteBranch: result.remote.find(b => b.current)?.name || '' });
+    emit('fetch_commit_count', { remote: remote, remoteBranch: result.remote.find(b => b.current)?.name || '' });
     return true;
   }, []);
 
-  const selecteLocalBranch = useCallback(async (branch: string) => {
+  const selecteLocalBranch = useCallback(async (branch: string, remote: Remote) => {
     if (branch === '') {
       showToast('브랜치를 선택해주세요.', 'error');
       return;
-    }  
+    }     
 
     // // 요청 보내서 checkout 진행해야하고 -vv 로 브랜치 정보 최신화 해줘야함    
     // const result = await showConfirm('로컬 브랜치 경고', `로컬 브랜치가 달라지면 현재 작업 중인 내용이 사라지거나 충돌이 발생할 수 있습니다. 
@@ -37,9 +39,10 @@ export function useBranches() {
     // )
 
     // if (!result[0] || !result[1]) return;
-    if (!selectedRemote) return;
+    if (!remote) return;
 
-    emit('checkout_local_branch', { branch, selectedRemoteBranch: '', selectedRemote });
+    emit('checkout_local_branch', { branch, selectedRemoteBranch: '', remote });
+    emit('fetch_changed_files', { remote });
     setSelectedLocalBranch(branch);
   }, []);
 
@@ -51,10 +54,12 @@ export function useBranches() {
 
   useEffect(() => {
     on('checkout_local_branch_response', (data: { success: boolean; message: string }) => {
-
+      if (data.success) {
+        showToast('로컬 브랜치 변경 성공', 'success');
+      } else {
+        showToast(`로컬 브랜치 변경 실패: ${data.message}`, 'error');
+      }
     })
-
-
     return () => {
       off('checkout_local_branch_response');
     }

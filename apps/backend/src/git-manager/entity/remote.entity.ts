@@ -14,7 +14,19 @@ export class Remote {
 
   @Column()
   path: string;
-  
+
+}
+@Entity()
+export class UserRemoteJoin {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
   @Column()
   userCd: string;
+
+  @Column()
+  remoteId: string;
+
+  @Column({ default: true })
+  status: boolean;
 }

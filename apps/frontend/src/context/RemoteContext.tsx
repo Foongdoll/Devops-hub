@@ -18,6 +18,8 @@ interface RemoteContextType {
   setSelectedRemoteBranch: (branch: string) => void;
   pushCount: number;
   pullCount: number;
+  setPushCount: (count: number) => void;
+  setPullCount: (count: number) => void;
 }
 
 const RemoteContext = createContext<RemoteContextType | undefined>(undefined);
@@ -45,20 +47,6 @@ export const RemoteProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [pushCount, setPushCount] = useState(0);
   const [pullCount, setPullCount] = useState(0);
 
-  const fetchPushCount = (count: number) => {
-    setPushCount(count);
-  }
-
-  const fetchPullCount = (count: number) => {
-    setPullCount(count);
-  }
-
-  const fetchAllCounts = (push: number, pull: number) => {
-    setPushCount(push);   
-    setPullCount(pull);
-  }
-
-
   return (
     <RemoteContext.Provider value={{
       selectedRemote,
@@ -75,7 +63,9 @@ export const RemoteProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setSelectedRemoteBranch,
 
       pushCount,
+      setPushCount,
       pullCount,
+      setPullCount
     }}>
       {children}
     </RemoteContext.Provider>

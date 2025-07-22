@@ -13,9 +13,10 @@ export function useChanges(initialUnstaged: File[] = [], initialStaged: File[] =
   const [fileDiff, setFileDiff] = useState<string>('');
   const [commitMsg, setCommitMsg] = useState('');
 
-  const {selectedLocalBranch, selectedRemoteBranch} = useRemoteContext();
+  const { selectedRemoteBranch } = useRemoteContext();
   const { emit, on, off } = useGitSocket();
 
+  // 파일 스테이징/언스테이징
   const stageFile = useCallback((file: File) => {
     setUnstagedFiles(prev => prev.filter(f => f.path !== file.path));
     setStagedFiles(prev => [...prev, file]);
@@ -26,6 +27,8 @@ export function useChanges(initialUnstaged: File[] = [], initialStaged: File[] =
     setUnstagedFiles(prev => [...prev, file]);
     setSelectedFile(file);
   }, []);
+
+  // 파일 선택
   const selectFile = useCallback((file: File, remote: Remote) => {
     emit('fetch_file_diff', { remote: remote, filePath: file.path, fileStaged: file.staged });
 
@@ -33,12 +36,14 @@ export function useChanges(initialUnstaged: File[] = [], initialStaged: File[] =
     setSelectedFile(file);
   }, []);
 
+  // 커밋
   const commit = useCallback((remote: Remote) => {
     if (stagedFiles.length && commitMsg.trim()) {
       setStagedFiles([]);
       setCommitMsg('');
     }
-    showLoading({message: '커밋 진행 중...'});
+
+    showLoading({ message: '커밋 진행 중...' });
     emit('commit_files', { remote: remote, files: stagedFiles, message: commitMsg, remoteBranch: selectedRemoteBranch });
 
   }, [stagedFiles, commitMsg]);
@@ -55,8 +60,8 @@ export function useChanges(initialUnstaged: File[] = [], initialStaged: File[] =
     // 변경 파일 리스트 조회
     on('fetch_changed_files_response', (data: { status: string; path: string, staged: boolean }[]) => {
       if (data) {
-        const staged : File[] = [];
-        const unstaged : File[] = [];
+        const staged: File[] = [];
+        const unstaged: File[] = [];
         data.forEach(({ status, path, staged: isStaged }) => {
           const file = { status, path, name: path, staged: isStaged } as File;
           if (isStaged) staged.push(file);
@@ -64,6 +69,7 @@ export function useChanges(initialUnstaged: File[] = [], initialStaged: File[] =
         });
         setStagedFiles(staged);
         setUnstagedFiles(unstaged);
+        setFileDiff('');
       }
     });
 
@@ -72,13 +78,22 @@ export function useChanges(initialUnstaged: File[] = [], initialStaged: File[] =
       setFileDiff(diff);
     });
 
-    on('commit_files_response', async (response: { success: boolean, message: string }) => {
+    on('commit_files_response', async (response: {
+      success: boolean,
+      message: string,
+      remote: Remote,
+      remoteBranch: string
+    }) => {
       await delay(1000);
       hideLoading();
       if (response.success) {
         showToast('커밋이 성공적으로 완료되었습니다.', 'success');
         setStagedFiles([]);
         setCommitMsg('');
+
+        emit('fetch_pull_request_count', { remote: response.remote, remoteBranch: response.remoteBranch });
+        emit('fetch_commit_count', { remote: response.remote, remoteBranch: response.remoteBranch });
+
       } else {
         showToast('커밋이 실패하였습니다.', 'error');
         // console.error(response.message);

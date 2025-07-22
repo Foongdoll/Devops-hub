@@ -2,7 +2,6 @@ import TopActionBar from "../components/git/TopActionBar";
 import TabNav from "../components/git/TabNav";
 import RemotesPanel from "../components/git/RemotesPanel";
 import ChangesPanel from "../components/git/ChangesPanel";
-import BranchesPanel from "../components/git/BranchsPanel";
 import StashPanel from "../components/git/StashPanel";
 import { useGitManager } from "../customhook/useGitManager";
 import { CommitHistoryPanel } from "../components/git/CommitHistoryPanel";

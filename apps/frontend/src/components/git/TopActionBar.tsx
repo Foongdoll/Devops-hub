@@ -1,12 +1,15 @@
 import { ArrowUpFromLine, ArrowDownFromLine, RefreshCcw, Archive } from 'lucide-react';
 import type React from 'react';
 import { useRemoteContext } from '../../context/RemoteContext';
+import type { Remote } from '../../customhook/git/useRemote';
+import { useEffect } from 'react';
+import { useGitSocket } from '../../context/GitSocketContext';
 
 export type TopActionBarProps = {
-  onPush: () => void;
-  onPull: () => void;
+  onPush: (remote: Remote | null, remoteBranch: string) => void;
+  onPull: (remote: Remote | null, remoteBranch: string) => void;
   onFetch: () => void;
-  onStash: () => void;  
+  onStash: () => void;
 };
 
 const badgeStyle =
@@ -15,13 +18,13 @@ const badgeStyle =
 const TopActionBar: React.FC<TopActionBarProps> = ({
   onPush, onPull, onFetch, onStash
 }) => {
-  const { pushCount, pullCount } = useRemoteContext();
-  
+  const { pushCount, pullCount, selectedRemoteBranch, selectedRemote } = useRemoteContext();
+ 
   return (
     <div className="flex items-center gap-2">
       <div className="relative">
         <button
-          onClick={onPush}
+          onClick={() => onPush(selectedRemote || null, selectedRemoteBranch)}
           className="p-2 rounded-full hover:bg-blue-900 transition-colors group"
           title="Push"
         >
@@ -33,7 +36,7 @@ const TopActionBar: React.FC<TopActionBarProps> = ({
       </div>
       <div className="relative">
         <button
-          onClick={onPull}
+          onClick={() => onPull(selectedRemote || null, selectedRemoteBranch)}
           className="p-2 rounded-full hover:bg-blue-900 transition-colors group"
           title="Pull"
         >

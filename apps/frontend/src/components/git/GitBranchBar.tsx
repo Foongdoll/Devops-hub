@@ -61,7 +61,7 @@ export const TopStageBar: React.FC<{
                 <select
                     className="bg-gray-800 border border-gray-700 rounded-lg text-gray-100 px-2 py-1 min-w-[110px] outline-none focus:ring-2 focus:ring-blue-500"
                     value={selectedLocalBranch}
-                    onChange={e => {
+                    onChange={e => {                        
                         onSelectLocalBranch(e.target.value, selectedRemote || { name: '', url: '' } as Remote);
                     }}
                 >

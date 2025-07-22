@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Remote } from './entity/remote.entity';
-import { Repository } from 'typeorm';
+import { Remote, UserRemoteJoin } from './entity/remote.entity';
+import { In, Repository } from 'typeorm';
 import { ApiResponse } from 'src/common/dto/response.dto';
 import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
@@ -16,10 +16,13 @@ export class GitManagerService {
   constructor(
     @InjectRepository(Remote)
     private readonly remoteRepository: Repository<Remote>,
+    @InjectRepository(UserRemoteJoin)
+    private readonly userRemoteJoinRepository: Repository<UserRemoteJoin>,
   ) { }
 
   async getRemotes(user: UserType): Promise<ApiResponse<Remote[]>> {
-    const remotes = await this.remoteRepository.find({ where: { userCd: user.sub } });
+    const remoteIds = await this.userRemoteJoinRepository.find({ where: { userCd: user.sub } });
+    const remotes = await this.remoteRepository.find({ where: { id: In(remoteIds.map(remote => remote.remoteId)) } });
     return ApiResponse.success(remotes, '원격 저장소 목록을 가져왔습니다.');
   }
   /**
@@ -33,8 +36,11 @@ export class GitManagerService {
       const remoteEntity = new Remote();
       remoteEntity.name = remote.name;
       remoteEntity.url = remote.url;
-      remoteEntity.path = remote.path.replace(/\\/g, '/');
-      remoteEntity.userCd = user.sub;
+      remoteEntity.path = remote.path.replace(/\\/g, '/');      
+      const userRemoteJoinEntity = this.userRemoteJoinRepository.create({
+        userCd: user.sub,
+        remoteId: remoteEntity.id
+      });
 
       this.logger.log(`새로운 원격 저장소 추가: ${JSON.stringify(remoteEntity)}`);
       // Git 초기화 및 원격 저장소 추가
@@ -65,6 +71,7 @@ export class GitManagerService {
       this.logger.log(`Git tracking branch output: ${trackingBranchOut}`);
 
       const newRemote = this.remoteRepository.create(remoteEntity);
+      await this.userRemoteJoinRepository.save(userRemoteJoinEntity);
       const result = await this.remoteRepository.save(newRemote)
 
       this.logger.log('새로운 원격 저장소 추가:', result);
@@ -107,6 +114,8 @@ export class GitManagerService {
   */
   async fetchBranches(remote: Remote): Promise<ApiResponse> {
     try {
+      const { stdout, stderr } = await execFileAsync('git', ['-C', remote.path, 'fetch', '--all']);
+    
       const { stdout: remoteB, stderr: remoteErr } = await execFileAsync('git', ['-C', remote.path, 'branch', '-a']);
       const { stdout: localB, stderr: branchErr } = await execFileAsync('git', ['-C', remote.path, 'branch']);
       if (branchErr) {

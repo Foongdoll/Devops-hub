@@ -18,7 +18,7 @@ export interface ChangesPanelProps {
   setCommitMsg: (msg: string) => void;
   onCommit: (remote: Remote, isPush: boolean) => void;
   fetchChanges: (remote: Remote) => Promise<void>;
-  onSelectLocalBranch: (branch: string) => void;
+  onSelectLocalBranch: (branch: string, remote: Remote) => void;
   onSelectRemoteBranch: (branch: string) => void;
 }
 
@@ -40,6 +40,7 @@ const ChangesPanel: React.FC<ChangesPanelProps> = ({
     // 초기 로드 시 변경 사항 가져오기    
     if (!selectedRemote) return;
     fetchChanges(selectedRemote);
+    
   }, [selectedRemote]);
 
 
