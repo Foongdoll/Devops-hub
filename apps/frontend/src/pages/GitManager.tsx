@@ -17,7 +17,7 @@ const GitManager = () => {
           onPush={git.push}
           onPull={git.pull}
           onFetch={git.fetch}
-          onStash={git.stash}
+          onStash={git.stash}          
         />
       </TabNav>
 
@@ -32,7 +32,8 @@ const GitManager = () => {
             selectCommit={git.selectCommit}
             closeContextMenu={git.closeContextMenu}
             handleMenuAction={git.handleMenuAction}            
-            commitBranches={git.commitBranches}            
+            commitBranches={git.commitBranches}     
+            onSelectBranch={git.selecteRemoteBranch}
           />
         )}
         {git.tab === "remotes" && (
@@ -58,9 +59,12 @@ const GitManager = () => {
             commitMsg={git.commitMsg}
             setCommitMsg={git.setCommitMsg}
             onCommit={git.commit}
+            fetchChanges={git.fetchChanges}
+            onSelectLocalBranch={git.selecteLocalBranch}
+            onSelectRemoteBranch={git.selecteRemoteBranch}
           />
         )}
-        {git.tab === "branches" && (
+        {/* {git.tab === "branches" && (
           <BranchesPanel
             local={git.localBranches}
             remotes={git.remoteBranches}
@@ -68,7 +72,7 @@ const GitManager = () => {
             onCheckout={git.checkoutBranch}
             onDelete={git.deleteBranch}
           />
-        )}
+        )} */}
         {git.tab === "stash" && (
           <StashPanel
             stashes={git.stashes}

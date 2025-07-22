@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState } from "react";
 import type { Remote } from "../customhook/git/useRemote";
-import type { Branch, TrackingBranch } from "../customhook/git/useBranches";
+import type { Branch } from "../customhook/git/useBranches";
 
 
 interface RemoteContextType {
@@ -10,10 +10,14 @@ interface RemoteContextType {
   setLocalBranches: (branches: Branch[]) => void;
   remoteBranches: Branch[];
   setRemoteBranches: (branches: Branch[]) => void;
-  trackingBranches: TrackingBranch[];
-  setTrackingBranches: (branches: TrackingBranch[]) => void;
   commitBranches: string[];
   setCommitBranches: (branches: string[]) => void;
+  selectedLocalBranch: string;
+  setSelectedLocalBranch: (branch: string) => void;
+  selectedRemoteBranch: string;
+  setSelectedRemoteBranch: (branch: string) => void;
+  pushCount: number;
+  pullCount: number;
 }
 
 const RemoteContext = createContext<RemoteContextType | undefined>(undefined);
@@ -25,11 +29,35 @@ export const useRemoteContext = () => {
 };
 
 export const RemoteProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // 선택된 리모트
   const [selectedRemote, setSelectedRemote] = useState<Remote | null>(null);
+  // 로컬 브랜치 목록
   const [localBranches, setLocalBranches] = useState<Branch[]>([]);
+  // 리모트 브랜치 목록
   const [remoteBranches, setRemoteBranches] = useState<Branch[]>([]);
-  const [trackingBranches, setTrackingBranches] = useState<TrackingBranch[]>([]);
+  // 커밋 브랜치 목록
   const [commitBranches, setCommitBranches] = useState<string[]>([]);
+  // 선택된 로컬 브랜치
+  const [selectedLocalBranch, setSelectedLocalBranch] = useState<string>("");
+  // 선택된 리모트 브랜치
+  const [selectedRemoteBranch, setSelectedRemoteBranch] = useState<string>("");
+
+  const [pushCount, setPushCount] = useState(0);
+  const [pullCount, setPullCount] = useState(0);
+
+  const fetchPushCount = (count: number) => {
+    setPushCount(count);
+  }
+
+  const fetchPullCount = (count: number) => {
+    setPullCount(count);
+  }
+
+  const fetchAllCounts = (push: number, pull: number) => {
+    setPushCount(push);   
+    setPullCount(pull);
+  }
+
 
   return (
     <RemoteContext.Provider value={{
@@ -39,10 +67,15 @@ export const RemoteProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setLocalBranches,
       remoteBranches,
       setRemoteBranches,
-      trackingBranches,
-      setTrackingBranches,
       commitBranches,
-      setCommitBranches
+      setCommitBranches,
+      selectedLocalBranch,
+      setSelectedLocalBranch,
+      selectedRemoteBranch,
+      setSelectedRemoteBranch,
+
+      pushCount,
+      pullCount,
     }}>
       {children}
     </RemoteContext.Provider>

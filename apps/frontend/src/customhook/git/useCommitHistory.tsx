@@ -32,7 +32,7 @@ export const useCommitHistory = () => {
   const { selectedRemote, setCommitBranches } = useRemoteContext();
 
   // 커밋 히스토리 불러오기
-  const fetchCommitHistory = useCallback((remote: Remote) => {
+  const fetchCommitHistory = useCallback((remote: Remote) => {    
     emit("fetch_commit_history", remote);
   }, [socket]);
 

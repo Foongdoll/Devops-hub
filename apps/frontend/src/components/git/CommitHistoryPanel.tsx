@@ -1,6 +1,8 @@
-import React from "react";
+import React, { type JSX } from "react";
 import { MoreVertical, GitCommit, GitBranch, Link } from "lucide-react";
 import type { Commit } from "../../customhook/git/useCommitHistory";
+import { useRemoteContext } from "../../context/RemoteContext";
+import { TopBar } from "./GitBranchBar";
 
 // props 타입 정의
 export interface CommitHistoryPanelProps {
@@ -11,10 +13,7 @@ export interface CommitHistoryPanelProps {
   selectCommit?: (hash: string) => void;
   closeContextMenu?: () => void;
   handleMenuAction?: (action: string, commit: Commit) => void;
-  commitBranches: string[];
-  localBranch?: string;
-  remoteBranch?: string;
-  selectedBranch?: string;
+  commitBranches: string[];  
   onSelectBranch?: (branch: string) => void;
 }
 
@@ -32,37 +31,7 @@ function getRefBranches(commits: Commit[]): string[] {
   return Array.from(refs).filter(Boolean);
 }
 
-// 상단 바
-const TopBar: React.FC<{
-  branches: string[];
-  selectedBranch: string | undefined;
-  onSelectBranch: (v: string) => void;
-  localBranch?: string;
-  remoteBranch?: string;
-}> = ({
-  branches, selectedBranch, onSelectBranch, localBranch, remoteBranch
-}) => (
-    <div className="flex items-center justify-between gap-2 mb-4 w-full px-1 flex-wrap">
-      <div className="flex items-center gap-2 mb-1 flex-shrink-0">
-        <GitBranch size={18} className="text-purple-400" />
-        <select
-          className="bg-gray-800 border border-gray-700 rounded-lg text-gray-100 px-2 py-1 min-w-[110px] outline-none focus:ring-2 focus:ring-blue-500"
-          value={selectedBranch}
-          onChange={e => onSelectBranch(e.target.value)}
-        >
-          <option value="">전체</option>
-          {branches.map(b => (
-            <option key={b} value={b}>{b}</option>
-          ))}
-        </select>
-      </div>
-      <div className="flex items-center gap-2 text-xs bg-[#232347] rounded-xl px-3 py-1">
-        <span>로컬: <b className="text-blue-400">{localBranch || "?"}</b></span>
-        <Link size={15} className="mx-1 text-blue-400" />
-        <span>리모트: <b className="text-cyan-400">{remoteBranch || "없음"}</b></span>
-      </div>
-    </div>
-  );
+
 
 // 그래프 SVG 렌더 함수
 function renderGraph(
@@ -132,11 +101,11 @@ export const CommitHistoryPanel: React.FC<CommitHistoryPanelProps> = ({
   closeContextMenu,
   handleMenuAction,
   commitBranches,
-  localBranch,
-  remoteBranch,
-  selectedBranch,
-  onSelectBranch,
+  onSelectBranch  
 }) => {
+
+  const { localBranches, remoteBranches, selectedLocalBranch, setSelectedLocalBranch, selectedRemoteBranch, setSelectedRemoteBranch } = useRemoteContext();  
+
   // 인덱스 매핑
   const hashToIndex = React.useMemo(() => {
     const map: Record<string, number> = {};
@@ -149,19 +118,20 @@ export const CommitHistoryPanel: React.FC<CommitHistoryPanelProps> = ({
 
   // 브랜치 필터 (refs 기준)
   const filteredCommits = React.useMemo(() => {
-    if (!selectedBranch) return commits;
-    return commits.filter(commit => commit.refs && commit.refs.includes(selectedBranch));
-  }, [selectedBranch, commits]);
+    return commits;
+    // if (!selectedRemoteBranch) return commits;
+    // return commits.filter(commit => commit.refs && commit.refs.includes(selectedRemoteBranch));
+  }, [selectedRemoteBranch, commits]);
 
   return (
-    <section className="bg-gray-900 p-4 rounded-2xl shadow flex flex-col gap-0 overflow-y-auto h-full w-full">
+    <section className="bg-gray-900 p-4 rounded-2xl shadow flex flex-col gap-0 h-full w-full">
       {/* 상단 바 */}
       <TopBar
         branches={branchOptions}
-        selectedBranch={selectedBranch || ""}
+        selectedBranch={selectedRemoteBranch}
         onSelectBranch={onSelectBranch || (() => { })}
-        localBranch={localBranch}
-        remoteBranch={remoteBranch}
+        localBranch={localBranches.map(b => b.current ? b.name : null).join("")}
+        remoteBranch={remoteBranches.map(b => b.current ? b.name : null).join("")}
       />
 
       {/* 커밋 리스트 */}
