@@ -23,9 +23,7 @@ axiosInstance.interceptors.request.use(
 // ✅ 응답 인터셉터 (전역 알림, 에러 핸들링)
 axiosInstance.interceptors.response.use(
   (res: AxiosResponse) => {
-    const { message, type } = res.data || {};
-
-    console.log('응답 데이터:', res);
+    const { message, type } = res.data || {};    
 
     // 성공 메시지 있으면 토스트로!
     if (message) {

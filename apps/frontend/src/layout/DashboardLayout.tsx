@@ -13,7 +13,7 @@ const DashboardLayout: React.FC = () => {
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       {/* Main: TopBar + Outlet */}
-      <div className="flex-1 flex flex-col bg-white">
+      <div className="flex-1 flex flex-col bg-white overflow-y-hidden">
         <TopBar onToggleSidebar={() => setSidebarOpen(o => !o)} />
         <div className="flex-1 overflow-auto">
           <Outlet />  {/* 이 자리에서만 렌더링 */}

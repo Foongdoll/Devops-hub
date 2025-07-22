@@ -1,4 +1,4 @@
-import { useRemotes, type Remote } from '../customhook/git/useRemote';
+import { useRemotes } from '../customhook/git/useRemote';
 import { useChanges } from '../customhook/git/useChanges';
 import { useBranches } from '../customhook/git/useBranches';
 import { useStash } from '../customhook/git/useStash';
@@ -14,9 +14,7 @@ export const useGitManager = () => {
   const branches = useBranches();
   const stash = useStash();
   const actions = useTopActionBar();
-  const commitHistory = useCommitHistory([
-    { hash: "abcd1234", message: "feat: 최초 커밋", author: "신현우", date: "2025-07-20", branches: ["main"] },
-  ]);
+  const commitHistory = useCommitHistory();
 
   const [tab, setTab] = useState<tabType>('remotes');
 
@@ -30,4 +28,3 @@ export const useGitManager = () => {
     ...commitHistory,
   };
 };
- 

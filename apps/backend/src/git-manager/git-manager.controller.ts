@@ -8,6 +8,7 @@ import { ApiResponse } from 'src/common/dto/response.dto';
 import { User } from 'src/common/decorator/user.decorator';
 import { AddRemoteDto } from './dto/addRemote.dto';
 import { ApiOperation } from '@nestjs/swagger';
+import { TrackingBranch } from 'src/common/type/git.interface';
 
 @UseGuards(JwtAuthGuard, RoleGuard)
 @Roles('USER')
@@ -38,4 +39,10 @@ export class GitManagerController {
   async deleteRemote(@Body() { id }: { id: string }): Promise<ApiResponse<void>> {
     return await this.gitManagerService.deleteRemote(id);
   }
+  
+  @Post('fetchBranches')
+  @ApiOperation({ summary: '브랜치 목록 조회', description: '특정 원격 저장소의 브랜치 목록을 조회합니다.', parameters: [] })
+  async fetchBranches(@Body() { remote }: { remote: Remote }): Promise<ApiResponse> {
+    return await this.gitManagerService.fetchBranches(remote);
+  } 
 }

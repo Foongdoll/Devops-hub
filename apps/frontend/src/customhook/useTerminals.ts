@@ -116,8 +116,7 @@ export function useTerminals({ handleRefresh }: { handleRefresh?: () => void } =
     try {
       setLoading(true);
       // setError(null);
-      const res = await TerminalService.createSession(data) as any;
-      console.log('Session created:', res);
+      const res = await TerminalService.createSession(data) as any;      
       if (res) {
         setSessions(prev => [...prev, res]);
         setSelectedId(res.id);

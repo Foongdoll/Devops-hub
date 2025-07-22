@@ -1,4 +1,4 @@
-import type { Branch } from "../../customhook/useGitManager";
+import type { Branch } from "../../customhook/git/useBranches";
 
 
 export interface TrackingBranch {

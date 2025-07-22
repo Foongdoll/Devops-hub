@@ -1,17 +1,17 @@
 import { useState, useCallback, useEffect } from 'react';
 import { addRemoteImpl, deleteRemoteImpl, editRemoteImpl, fetchRemotesImpl } from '../../services/GitManagerService';
 import { showToast } from '../../utils/notifyStore';
+import { useRemoteContext } from '../../context/RemoteContext';
 
 export type Remote = { id: string; name: string; url: string, path: string };
 
 export function useRemotes(initial: Remote[] = []) {
   const [remotes, setRemotes] = useState<Remote[]>(initial);
-  const [selectedRemote, setSelectedRemote] = useState<Remote | null>(null);
-
+  const { selectedRemote, setSelectedRemote } = useRemoteContext();
   // 초기 로드 시 remotes가 비어있을 경우 기본값 설정
   useEffect(() => {
     const fetchRemotes = async () => {
-      const remotes = await fetchRemotesImpl();      
+      const remotes = await fetchRemotesImpl();
       setRemotes(remotes);
     }
     fetchRemotes();
@@ -51,7 +51,7 @@ export function useRemotes(initial: Remote[] = []) {
   }, []);
 
   const selectRemote = useCallback(async (remote: Remote): Promise<boolean> => {
-    setSelectedRemote(remote);
+    setSelectedRemote(remote);    
     return true;
   }, []);
 

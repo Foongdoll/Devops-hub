@@ -17,7 +17,7 @@ const GitManager = () => {
           onPush={git.push}
           onPull={git.pull}
           onFetch={git.fetch}
-          onStash={git.stash}
+          onStash={git.stash}          
         />
       </TabNav>
 
@@ -25,12 +25,15 @@ const GitManager = () => {
       <main className="flex-1 overflow-y-auto">
         {git.tab === "history" && (
           <CommitHistoryPanel
-            commits={git.commits}
+            commits={git.commits}            
+            commitsWithBranches={git.commitsWithBranches}
             onContextMenu={git.openContextMenu}
             selectedHash={git.selectedHash}
             selectCommit={git.selectCommit}
             closeContextMenu={git.closeContextMenu}
-            handleMenuAction={git.handleMenuAction}
+            handleMenuAction={git.handleMenuAction}            
+            commitBranches={git.commitBranches}     
+            onSelectBranch={git.selecteRemoteBranch}
           />
         )}
         {git.tab === "remotes" && (
@@ -41,6 +44,7 @@ const GitManager = () => {
             onRemove={git.removeRemote}
             onChange={git.setTab}
             onSelect={git.selectRemote}
+            onBranchSelect={git.fetchBranches}
           />
         )}
         {git.tab === "changes" && (
@@ -55,9 +59,12 @@ const GitManager = () => {
             commitMsg={git.commitMsg}
             setCommitMsg={git.setCommitMsg}
             onCommit={git.commit}
+            fetchChanges={git.fetchChanges}
+            onSelectLocalBranch={git.selecteLocalBranch}
+            onSelectRemoteBranch={git.selecteRemoteBranch}
           />
         )}
-        {git.tab === "branches" && (
+        {/* {git.tab === "branches" && (
           <BranchesPanel
             local={git.localBranches}
             remotes={git.remoteBranches}
@@ -65,7 +72,7 @@ const GitManager = () => {
             onCheckout={git.checkoutBranch}
             onDelete={git.deleteBranch}
           />
-        )}
+        )} */}
         {git.tab === "stash" && (
           <StashPanel
             stashes={git.stashes}
