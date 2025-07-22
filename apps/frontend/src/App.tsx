@@ -17,6 +17,9 @@ const RequireAuth = ({ children }: { children: React.ReactNode }) => {
   return isAuthed ? <>{children}</> : <Navigate to="/login" />;
 };
 
+
+
+
 const SocketCheck = () => {
   const { socket: ws, isConnected: isWsConnected } = useGitSocket();
   const { socket: socketIO, isConnected: isSocketConnected } = useSocket();
