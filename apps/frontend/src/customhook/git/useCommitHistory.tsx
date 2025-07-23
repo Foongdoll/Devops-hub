@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useMemo } from "react";
 import { useGitSocket } from "../../context/GitSocketContext";
 import { useRemoteContext } from "../../context/RemoteContext";
 import type { Remote } from "./useRemote";
+import { fetchCounts } from "../useGitManager";
 
 // 커밋 타입
 export interface Commit {
@@ -29,7 +30,7 @@ export const useCommitHistory = () => {
   const [menu, setMenu] = useState<ContextMenuState | null>(null);
 
   // 소켓 이벤트 리스너 등록
-  const { selectedRemote, setCommitBranches } = useRemoteContext();
+  const { selectedRemote, setCommitBranches, selectedRemoteBranch } = useRemoteContext();
 
   // 커밋 히스토리 불러오기
   const fetchCommitHistory = useCallback((remote: Remote) => {
@@ -40,7 +41,9 @@ export const useCommitHistory = () => {
     if (!selectedRemote) return;
     fetchCommitHistory(selectedRemote);
 
-    const handler = (commits: Commit[]) => setCommits(commits);
+    const handler = (commits: Commit[]) => {
+      setCommits(commits)            
+    };
 
     on("fetch_commit_history_response", handler);
 

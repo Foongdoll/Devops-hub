@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Remote } from './entity/remote.entity';
-import { Repository } from 'typeorm';
+import { Remote, UserRemoteJoin } from './entity/remote.entity';
+import { In, Repository } from 'typeorm';
 import { ApiResponse } from 'src/common/dto/response.dto';
 import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
@@ -16,10 +16,13 @@ export class GitManagerService {
   constructor(
     @InjectRepository(Remote)
     private readonly remoteRepository: Repository<Remote>,
+    @InjectRepository(UserRemoteJoin)
+    private readonly userRemoteJoinRepository: Repository<UserRemoteJoin>,
   ) { }
 
   async getRemotes(user: UserType): Promise<ApiResponse<Remote[]>> {
-    const remotes = await this.remoteRepository.find({ where: { userCd: user.sub } });
+    const remoteIds = await this.userRemoteJoinRepository.find({ where: { userCd: user.sub } });
+    const remotes = await this.remoteRepository.find({ where: { id: In(remoteIds.map(remote => remote.remoteId)) } });
     return ApiResponse.success(remotes, '원격 저장소 목록을 가져왔습니다.');
   }
   /**
@@ -33,8 +36,11 @@ export class GitManagerService {
       const remoteEntity = new Remote();
       remoteEntity.name = remote.name;
       remoteEntity.url = remote.url;
-      remoteEntity.path = remote.path.replace(/\\/g, '/');
-      remoteEntity.userCd = user.sub;
+      remoteEntity.path = remote.path.replace(/\\/g, '/');      
+      const userRemoteJoinEntity = this.userRemoteJoinRepository.create({
+        userCd: user.sub,
+        remoteId: remoteEntity.id
+      });
 
       this.logger.log(`새로운 원격 저장소 추가: ${JSON.stringify(remoteEntity)}`);
       // Git 초기화 및 원격 저장소 추가
@@ -46,7 +52,7 @@ export class GitManagerService {
       // 원격 저장소 추가
       const addRemoteArgs = ['-C', remoteEntity.path, 'remote', 'add', remoteEntity.name, remoteEntity.url];
       const { stdout: addRemoteOut, stderr: addRemoteErr } = await execFileAsync('git', addRemoteArgs);
-      
+
       this.logger.log(`Git add remote output: ${addRemoteOut}`);
 
       // 원격 저장소 업데이트
@@ -65,6 +71,7 @@ export class GitManagerService {
       this.logger.log(`Git tracking branch output: ${trackingBranchOut}`);
 
       const newRemote = this.remoteRepository.create(remoteEntity);
+      await this.userRemoteJoinRepository.save(userRemoteJoinEntity);
       const result = await this.remoteRepository.save(newRemote)
 
       this.logger.log('새로운 원격 저장소 추가:', result);
@@ -107,17 +114,41 @@ export class GitManagerService {
   */
   async fetchBranches(remote: Remote): Promise<ApiResponse> {
     try {
-      const { stdout: branches, stderr: branchErr } = await execFileAsync('git', ['-C', remote.path, 'branch', '-a']);
+      const { stdout, stderr } = await execFileAsync('git', ['-C', remote.path, 'fetch', '--all']);
+    
+      const { stdout: remoteB, stderr: remoteErr } = await execFileAsync('git', ['-C', remote.path, 'branch', '-a']);
+      const { stdout: localB, stderr: branchErr } = await execFileAsync('git', ['-C', remote.path, 'branch']);
       if (branchErr) {
         this.logger.error(`Git branch error: ${branchErr}`);
         return ApiResponse.error('브랜치 목록 조회에 실패했습니다.', { code: '500' });
       }
 
-      const localBranches = branches.split('\n').filter(b => b.startsWith('*')).map(b => ({ name: b.replace('* ', '').trim(), current: true }));
-      const remoteBranches = branches.split('\n').filter(b => b.startsWith('remotes/')).map(b => ({ name: b.replace('remotes/', '').trim() }));
-      const trackingBranches = []; // 트래킹 브랜치 로직은 추가 필요
+      const localBranches = localB
+        .split('\n')
+        .filter(b => b.trim() !== '')
+        .map(b => ({ name: b.replace('* ', '').trim(), current: b.startsWith('*') }))
 
-      return ApiResponse.success({ local: localBranches, remote: remoteBranches, tracking: trackingBranches });
+      const { stdout: trackingBranches, stderr: trackErr } = await execFileAsync('git', ['-C', remote.path, 'branch', '-vv']);
+
+      var current = trackingBranches.split('\n').map(b => {
+        if (b.startsWith('*')) {
+          return b.split('[')[1].split(']')[0];
+        }
+      }).find(Boolean);
+
+      if (current?.includes(":")) {
+        current = current.split(':')[0].trim();
+      }
+
+      const remoteBranches = remoteB.split('\n').filter(b =>
+        b.trim().startsWith('remotes/')).map(b =>
+          ({ name: b.replace('remotes/', '').trim(), current: b.replace('remotes/', '').trim() === current ? true : false }));
+
+      // console.log(`로컬 브랜치 목록: ${JSON.stringify(localBranches)}`);
+      // console.log(`원격 브랜치 목록: ${JSON.stringify(remoteBranches)}`);
+
+
+      return ApiResponse.success({ local: localBranches, remote: remoteBranches });
     } catch (error) {
       this.logger.error(`브랜치 목록 조회 중 오류 발생: ${error}`);
       return ApiResponse.error('브랜치 목록 조회에 실패했습니다.', { code: '500' });

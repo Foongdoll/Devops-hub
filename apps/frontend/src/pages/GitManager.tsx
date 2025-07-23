@@ -2,7 +2,6 @@ import TopActionBar from "../components/git/TopActionBar";
 import TabNav from "../components/git/TabNav";
 import RemotesPanel from "../components/git/RemotesPanel";
 import ChangesPanel from "../components/git/ChangesPanel";
-import BranchesPanel from "../components/git/BranchsPanel";
 import StashPanel from "../components/git/StashPanel";
 import { useGitManager } from "../customhook/useGitManager";
 import { CommitHistoryPanel } from "../components/git/CommitHistoryPanel";
@@ -17,7 +16,7 @@ const GitManager = () => {
           onPush={git.push}
           onPull={git.pull}
           onFetch={git.fetch}
-          onStash={git.stash}
+          onStash={git.stash}          
         />
       </TabNav>
 
@@ -32,7 +31,8 @@ const GitManager = () => {
             selectCommit={git.selectCommit}
             closeContextMenu={git.closeContextMenu}
             handleMenuAction={git.handleMenuAction}            
-            commitBranches={git.commitBranches}            
+            commitBranches={git.commitBranches}     
+            onSelectBranch={git.selecteRemoteBranch}
           />
         )}
         {git.tab === "remotes" && (
@@ -58,9 +58,12 @@ const GitManager = () => {
             commitMsg={git.commitMsg}
             setCommitMsg={git.setCommitMsg}
             onCommit={git.commit}
+            fetchChanges={git.fetchChanges}
+            onSelectLocalBranch={git.selecteLocalBranch}
+            onSelectRemoteBranch={git.selecteRemoteBranch}
           />
         )}
-        {git.tab === "branches" && (
+        {/* {git.tab === "branches" && (
           <BranchesPanel
             local={git.localBranches}
             remotes={git.remoteBranches}
@@ -68,7 +71,7 @@ const GitManager = () => {
             onCheckout={git.checkoutBranch}
             onDelete={git.deleteBranch}
           />
-        )}
+        )} */}
         {git.tab === "stash" && (
           <StashPanel
             stashes={git.stashes}

@@ -47,17 +47,55 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
     });
   }
 
-  // (원하는 만큼 상태/맵 등 정의)
-  private gitClients = new Map<string, any>();
+  // (원하는 만큼 상태/맵 등 정의) 키 : 리모트 ID, 값 : 소켓
+  private sockets: Socket[] = [];
+  private gitClients = new Map<string, Socket[]>();
 
   handleConnection(sock: Socket) {
     this.logger.log(`Git 소켓 연결됨: ${sock.id}`);
-    // 연결 시 로직
-    this.gitClients.set(sock.id, {});
+    // 연결 시 로직    
   }
-  handleDisconnect(sock: Socket) {
-    this.logger.log(`Git 소켓 연결 해제: ${sock.id}`);
-    this.gitClients.delete(sock.id);
+
+  handleDisconnect(socket: Socket) {
+    for (const [remoteId, sockets] of this.gitClients.entries()) {
+      const filtered = sockets.filter(s => s.id !== socket.id);
+      this.gitClients.set(remoteId, filtered);
+    }
+  }
+
+
+  /**
+    @param data Remote
+    @description
+    * Git에 연결된 회원 세션 관리 합니다.
+  **/
+  @SubscribeMessage('connect_git')
+  async handleConnectGit(
+    @MessageBody() data: { remote: Remote },
+    @ConnectedSocket() socket: Socket
+  ) {
+    const remoteId = data.remote.id;
+    socket.join(`git_${remoteId}`); // 그룹 참여
+
+    const existingSockets = this.gitClients.get(remoteId);
+
+    if (existingSockets) {
+      // 이미 등록된 remoteId인 경우, 배열에만 추가
+      existingSockets.push(socket);
+    } else {
+      // 없으면 새로 배열 생성해서 set
+      this.gitClients.set(remoteId, [socket]);
+    }
+
+    socket.emit('connect_git_response', { success: true, message: `Git Manager connet successful` });
+  }
+
+
+  private notifyAll(remote: Remote, message: string, type: 'pull' | 'push' | 'commit') {
+    const sockets = this.gitClients.get(remote.id) || [];
+    sockets.forEach(socket => {
+      socket.emit('git_notify', { message, type, remote });
+    });
   }
 
 
@@ -71,7 +109,7 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
     @ConnectedSocket() socket: Socket
   ) {
 
-    try {      
+    try {
       // Git 명령어 실행
       const { stdout: history, stderr } = await execFileAsync("git", [
         "-C", remote.path,
@@ -84,7 +122,7 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
         this.logger.error(`Git log error: ${stderr}`);
         socket.emit('fetch_commit_history_response', []);
         return;
-      }      
+      }
       // JSON 파싱
       const commits = history.split('\n').map(line => JSON.parse(line)) as fetch_commit_history[];
 
@@ -93,20 +131,342 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
       this.logger.error(`Git log command failed: ${error.message}`);
       socket.emit('fetch_commit_history_response', []);
     }
+  }
+  /**
+    변경 파일 리스트 조회
+    @Param data Remote
+  */
+  @SubscribeMessage('fetch_changed_files')
+  async handleFetchChangedFiles(
+    @MessageBody() remote: Remote,
+    @ConnectedSocket() socket: Socket
+  ) {    
+    try {
+      // Git 명령어 실행
+      const { stdout, stderr } = await execFileAsync("git", [
+        "-C", remote.path,
+        "status",
+        "-s"
+      ]);
+
+      // 변경된 파일 목록 파싱
+      const changedFiles = stdout.split('\n')
+        .filter(line => line.trim() !== '')
+        .map(line => {
+          let staged = false;
+          !line.startsWith(' ') && (staged = true)
+
+          const { status, path } = staged ? { status: line.split(' ')[0], path: line.split(' ')[2] } : { status: line.split(' ')[1], path: line.split(' ')[2] };
+          return { status: status, path: path, staged };
+        });
+
+      // console.log(changedFiles);
+      socket.emit('fetch_changed_files_response', changedFiles);
+    } catch (error) {
+      this.logger.error(`Git diff command failed: ${error.message}`);
+      socket.emit('fetch_changed_files_response', []);
+    }
+  }
+
+  /**
+     * diff 파일 조회
+     * @param data Remote
+     * @param filePath 파일 경로
+     */
+  @SubscribeMessage('fetch_file_diff')
+  async handleFetchFileDiff(
+    @MessageBody() { remote, filePath, fileStaged }: { remote: Remote; filePath: string, fileStaged: boolean },
+    @ConnectedSocket() socket: Socket
+  ) {
+    try {
+
+      const cmd = [
+        "-C", remote.path,
+        "diff",
+      ]
+
+      fileStaged && cmd.push("--cached")
+      cmd.push(filePath);
+      // Git 명령어 실행
+      const { stdout, stderr } = await execFileAsync("git", cmd);
+
+      socket.emit('fetch_file_diff_response', stdout);
+    } catch (error) {
+      this.logger.error(`Git diff command failed: ${error.message}`);
+      socket.emit('fetch_file_diff_response', '');
+
+    }
+  }
+
+  /**
+   * 커밋 파일 처리
+   * @Param data Remote, files, message
+   * @Description 
+   * 커밋할 파일 목록과 커밋 메시지를 받아서 Git commit 명령어를 실행합니다.
+   */
+  @SubscribeMessage('commit_files')
+  async handleCommitFiles(
+    @MessageBody() {
+      remote,
+      files,
+      message,
+      isPush,
+      remoteBranch }: { remote: Remote; files: { path: string; staged: boolean; }[]; message: string; isPush: boolean, remoteBranch: string },
+    @ConnectedSocket() socket: Socket
+  ) {
+    try {
+      if (!files.length || !message.trim()) {
+        socket.emit('commit_files_response', { success: false, message: 'No files to commit or empty commit message' });
+        return;
+      }
+
+      // Git 명령어 실행
+      const fileArgs = files.map(file => file.path);
+      const { stdout, stderr } = await execFileAsync("git", [
+        "-C", remote.path, // Assuming all files are from the same remote
+        "commit",
+        ...fileArgs,
+        "-m", message
+      ]);
+
+      this.logger.log(`Git commit successful: ${stdout}`);
+
+      // 푸쉬
+      if (isPush) {
+        const { stdout: pushStdout, stderr: pushStderr } = await execFileAsync("git", [
+          "-C", remote.path,
+          "push",
+          remoteBranch
+        ]);
+        this.logger.log(`Git push successful: ${pushStdout}`);
+      }
+
+      this.notifyAll(remote, `Committed files: ${files.map(f => f.path).join(', ')}`, 'commit');
+      socket.emit('commit_files_response', { success: true, message: 'Files committed successfully', remote: remote, remoteBranch: remoteBranch });
+    } catch (error) {
+      this.logger.error(`Git commit command failed: ${error.message}`);
+      socket.emit('commit_files_response', { success: false, message: error.message });
+    }
+  }
+
+  /**
+   * commit 개수 조회
+   * @param data Remote remoteBranch
+   * @Description
+   * remoteBranch의 커밋 개수를 조회합니다.
+   */
+  @SubscribeMessage('fetch_commit_count')
+  async handleFetchCommitCount(
+    @MessageBody() { remote, remoteBranch }: { remote: Remote; remoteBranch: string },
+    @ConnectedSocket() socket: Socket
+  ) {
+    try {
+      var tempRemote = '';
+      if (remoteBranch === '') {
+        const { stdout } = await execFileAsync("git", [
+          "-C", remote.path,
+          "branch",
+          "-vv"
+        ]);
+
+        stdout.trim().split('\n').forEach(line => {
+          if (line.includes('*')) {
+            if (line.split('[')[1].split(']')[0].indexOf(":") < 0) {
+              tempRemote = line.split('[')[1].split(']')[0];
+            } else {
+              tempRemote = line.split('[')[1].split(']')[0].split(':')[0];
+            }
+          }
+        });
+      }
 
 
+      const targetRef = tempRemote !== '' ? tempRemote : remoteBranch;
+      // Git 명령어 실행
+      const { stdout, stderr } = await execFileAsync("git", [
+        "-C", remote.path,
+        "rev-list",
+        "--count",
+        `${targetRef}..HEAD`,
+      ]);
+
+      console.log(stdout);
+
+      const count = parseInt(stdout.trim(), 10);
+      socket.emit('fetch_commit_count_response', { count: count });
+    } catch (error) {
+      this.logger.error(`Git rev-list command failed: ${error.message}`);
+      socket.emit('fetch_commit_count_response', { count: 0 });
+    }
+  }
+
+  /**
+   * pull request 개수 조회
+   * @param data Remote remoteBranch
+   * @Description
+   * remoteBranch의 pull request 개수를 조회합니다.
+   */
+  @SubscribeMessage('fetch_pull_request_count')
+  async handleFetchPullRequestCount(
+    @MessageBody() { remote, remoteBranch }: { remote: Remote; remoteBranch: string },
+    @ConnectedSocket() socket: Socket
+  ) {
+    try {
+      var tempRemote = '';
+      if (remoteBranch === '') {
+        const { stdout } = await execFileAsync("git", [
+          "-C", remote.path,
+          "branch",
+          "-vv"
+        ]);
+
+        stdout.trim().split('\n').forEach(line => {
+          if (line.includes('*')) {
+            if (line.split('[')[1].split(']')[0].indexOf(":") < 0) {
+              tempRemote = line.split('[')[1].split(']')[0];
+            } else {
+              tempRemote = line.split('[')[1].split(']')[0].split(':')[0];
+            }
+          }
+        });
+      }
+
+      const targetRef = tempRemote !== '' ? tempRemote : remoteBranch;
+      // Git 명령어 실행
+      const { stdout, stderr } = await execFileAsync("git", [
+        "-C", remote.path,
+        "rev-list",
+        "--count",
+        `HEAD..${targetRef}`,
+      ]);
+      console.log(stdout);
+
+      const count = parseInt(stdout.trim(), 10);
+      socket.emit('fetch_pull_request_count_response', { count: count });
+    } catch (error) {
+      this.logger.error(`Git rev-list command failed: ${error.message}`);
+      socket.emit('fetch_pull_request_count_response', { count: 0 });
+    }
   }
 
 
+  /**
+   * 로컬 브랜치 checkout
+   * @param data branch remote
+   * @Description
+   * 로컬 브랜치를 checkout 합니다.
+  */
+  @SubscribeMessage('checkout_local_branch')
+  async handleCheckoutLocalBranch(
+    @MessageBody() { branch, selectedRemoteBranch, remote }: { branch: string; selectedRemoteBranch: string; remote: Remote },
+    @ConnectedSocket() socket: Socket
+  ) {
+    try {      
+      console.log([
+        "-C", remote.path,
+        "branch",
+        "--list",
+        branch
+      ]);
+      // 1. 브랜치 존재 여부 확인
+      const { stdout: branchList } = await execFileAsync("git", [
+        "-C", remote.path,
+        "branch",
+        "--list",
+        branch
+      ]);
+      const branchExists = branchList.split('\n').map(b => b.replace('*', '').trim()).filter(Boolean).includes(branch);      
+
+      let checkoutResult;
+      if (branchExists) {
+        // 이미 브랜치가 있으면 그냥 이동
+        checkoutResult = await execFileAsync("git", [
+          "-C", remote.path,
+          "checkout",
+          branch,
+        ]);
+      } else {
+        // 없으면 -b 옵션으로 생성
+        checkoutResult = await execFileAsync("git", [
+          "-C", remote.path,
+          "checkout",
+          "-b",
+          branch,
+          selectedRemoteBranch // 기준 브랜치로 체크아웃
+        ]);
+      }
+
+      this.logger.log(`Git checkout local branch successful: ${checkoutResult.stdout}`);
+      socket.emit('checkout_local_branch_response', {
+        success: true, message: branchExists
+          ? `로컬 브랜치 ${branch}로 체크아웃 하였습니다.`
+          : `원격 브랜치 ${selectedRemoteBranch}로 체크아웃 후 로컬 브랜치 ${branch}를 생성하였습니다.`
+      });
+    } catch (error) {
+      this.logger.error(`Git checkout command failed: ${error.message}`);
+      
+      // would be overwritten by checkout 이게 있으면 충돌 난거니까 
+      // 커밋하거나 머지한 뒤 브랜치를 바꿔라 안내 메시지
+      
+      socket.emit('checkout_local_branch_response', { success: false, message: error.message });
+    }
+  }
 
 
+  /**
+    * 푸시  
+    * @param data Remote remoteBranch
+    * @Description 
+    * 원격 브랜치로 푸시합니다.
+    */
+  @SubscribeMessage('git_push')
+  async handleGitPush(
+    @MessageBody() { remote, remoteBranch }: { remote: Remote; remoteBranch: string },
+    @ConnectedSocket() socket: Socket
+  ) {
+    try {
+      // Git 명령어 실행
+      const { stdout, stderr } = await execFileAsync("git", [
+        "-C", remote.path,
+        "push",
+        remoteBranch
+      ]);
 
+      this.logger.log(`Git push successful: ${stdout}`);
+      socket.emit('git_push_response', { success: true, message: 'Push successful', remote: remote, remoteBranch: remoteBranch });
+    } catch (error) {
+      this.logger.error(`Git push command failed: ${error.message}`);
+      socket.emit('git_push_response', { success: false, message: error.message });
+    }
+  }
 
+  /**
+  * 풀
+  * @param data Remote remoteBranch
+  * @Description
+  * 원격 브랜치로부터 풀합니다.
+  */
+  @SubscribeMessage('git_pull')
+  async handleGitPull(
+    @MessageBody() { remote, remoteBranch }: { remote: Remote; remoteBranch: string },
+    @ConnectedSocket() socket: Socket
+  ) {
+    try {
+      // Git 명령어 실행
+      const { stdout, stderr } = await execFileAsync("git", [
+        "-C", remote.path,
+        "pull",
+        remoteBranch.split('/')[0],
+        remoteBranch.split('/')[1]
+      ]);
 
-
-
-
-
-
+      this.logger.log(`Git pull successful: ${stdout}`);
+      this.notifyAll(remote, `Pulled from ${remoteBranch}`, 'pull');
+      socket.emit('git_pull_response', { success: true, message: 'Pull successful', remote: remote, remoteBranch: remoteBranch });
+    } catch (error) {
+      this.logger.error(`Git pull command failed: ${error.message}`);
+      socket.emit('git_pull_response', { success: false, message: error.message });
+    }
+  }
 
 }

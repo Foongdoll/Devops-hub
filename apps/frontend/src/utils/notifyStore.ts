@@ -14,8 +14,8 @@ export function showToast(message: string, type: Notify['type']) {
   listeners.forEach(fn => fn({ message, type }));
 }
 
-export function showLoading() {
-  listeners.forEach(fn => fn({ message: "로딩 중...", type: 'loading' }));
+export function showLoading({message = "로딩 중..."}: { message?: string } = {}) {
+  listeners.forEach(fn => fn({ message, type: 'loading' }));
 }
 export function hideLoading() {
   listeners.forEach(fn => fn({ message: "", type: 'loading-hide' }));
