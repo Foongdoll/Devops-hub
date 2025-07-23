@@ -5,10 +5,11 @@ import { ApiResponse } from 'src/common/dto/response.dto';
 import { JwtAuthGuard } from 'src/auth/guard/jwt-auth.guard';
 import { RoleGuard } from 'src/auth/guard/role.guard';
 import { Roles } from 'src/common/decorator/rols.decorator';
-import { ApiOperation } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 
 @UseGuards(JwtAuthGuard, RoleGuard)
 @Roles('USER')
+@ApiBearerAuth()
 @Controller('terminal')
 export class TerminalController {
   constructor(private readonly svc: TerminalService) { }

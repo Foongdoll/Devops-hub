@@ -7,11 +7,12 @@ import { Remote } from './entity/remote.entity';
 import { ApiResponse } from 'src/common/dto/response.dto';
 import { User } from 'src/common/decorator/user.decorator';
 import { AddRemoteDto } from './dto/addRemote.dto';
-import { ApiOperation } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { TrackingBranch } from 'src/common/type/git.interface';
 
 @UseGuards(JwtAuthGuard, RoleGuard)
 @Roles('USER')
+@ApiBearerAuth()
 @Controller('git-manager')
 export class GitManagerController {
   constructor(private readonly gitManagerService: GitManagerService) { }
