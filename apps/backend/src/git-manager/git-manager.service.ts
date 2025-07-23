@@ -5,8 +5,10 @@ import { In, Repository } from 'typeorm';
 import { ApiResponse } from 'src/common/dto/response.dto';
 import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
+import * as fs from 'fs';
 import { UserType } from 'src/common/decorator/user.decorator';
 import { AddRemoteDto } from './dto/addRemote.dto';
+import {v4 as uuid} from 'uuid';
 const execFileAsync = promisify(execFile);
 
 @Injectable()
@@ -33,42 +35,49 @@ export class GitManagerService {
   */
   async addRemote(remote: AddRemoteDto, user: UserType): Promise<ApiResponse> {
     try {
+      const isGit = fs.existsSync(remote.path.replace(/\\/g, '/'));
       const remoteEntity = new Remote();
+      remoteEntity.id = uuid();
       remoteEntity.name = remote.name;
       remoteEntity.url = remote.url;
-      remoteEntity.path = remote.path.replace(/\\/g, '/');      
+      remoteEntity.path = remote.path.replace(/\\/g, '/');
+            
       const userRemoteJoinEntity = this.userRemoteJoinRepository.create({
         userCd: user.sub,
         remoteId: remoteEntity.id
       });
+      
+      // 경로가 존재하지 않으면 디렉토리 생성
+      if (!isGit) {
+        // Git 초기화 및 원격 저장소 추가
+        const initArgs = ['-C', remoteEntity.path, 'init'];
+        const { stdout: initOut, stderr: initErr } = await execFileAsync('git', initArgs)
+
+        this.logger.log(`Git init output: ${initOut}`);
+
+        // 원격 저장소 추가
+        const addRemoteArgs = ['-C', remoteEntity.path, 'remote', 'add', remoteEntity.name, remoteEntity.url];
+        const { stdout: addRemoteOut, stderr: addRemoteErr } = await execFileAsync('git', addRemoteArgs);
+
+        this.logger.log(`Git add remote output: ${addRemoteOut}`);
+
+        // 원격 저장소 업데이트
+        const updateArgs = ['-C', remoteEntity.path, 'remote', 'update'];
+        const { stdout: updateOut, stderr: updateErr } = await execFileAsync('git', updateArgs);
+
+        this.logger.log(`Git update remote output: ${updateOut}`);
+
+        const { stdout: branches, stderr: branchErr } = await execFileAsync('git', ['-C', remoteEntity.path, 'branch', '-r']);
+        const remoteBranch = branches.split('\n')[0].split('/')[1].trim();
+
+        // 원격 저장소 트래킹 브랜치 생성
+        const trackingBranchArgs = ['-C', remoteEntity.path, 'checkout', remoteBranch];
+        const { stdout: trackingBranchOut, stderr: trackingBranchErr } = await execFileAsync('git', trackingBranchArgs);
+
+        this.logger.log(`Git tracking branch output: ${trackingBranchOut}`);
+      }
 
       this.logger.log(`새로운 원격 저장소 추가: ${JSON.stringify(remoteEntity)}`);
-      // Git 초기화 및 원격 저장소 추가
-      const initArgs = ['-C', remoteEntity.path, 'init'];
-      const { stdout: initOut, stderr: initErr } = await execFileAsync('git', initArgs)
-
-      this.logger.log(`Git init output: ${initOut}`);
-
-      // 원격 저장소 추가
-      const addRemoteArgs = ['-C', remoteEntity.path, 'remote', 'add', remoteEntity.name, remoteEntity.url];
-      const { stdout: addRemoteOut, stderr: addRemoteErr } = await execFileAsync('git', addRemoteArgs);
-
-      this.logger.log(`Git add remote output: ${addRemoteOut}`);
-
-      // 원격 저장소 업데이트
-      const updateArgs = ['-C', remoteEntity.path, 'remote', 'update'];
-      const { stdout: updateOut, stderr: updateErr } = await execFileAsync('git', updateArgs);
-
-      this.logger.log(`Git update remote output: ${updateOut}`);
-
-      const { stdout: branches, stderr: branchErr } = await execFileAsync('git', ['-C', remoteEntity.path, 'branch', '-r']);
-      const remoteBranch = branches.split('\n')[0].split('/')[1].trim();
-
-      // 원격 저장소 트래킹 브랜치 생성
-      const trackingBranchArgs = ['-C', remoteEntity.path, 'checkout', remoteBranch];
-      const { stdout: trackingBranchOut, stderr: trackingBranchErr } = await execFileAsync('git', trackingBranchArgs);
-
-      this.logger.log(`Git tracking branch output: ${trackingBranchOut}`);
 
       const newRemote = this.remoteRepository.create(remoteEntity);
       await this.userRemoteJoinRepository.save(userRemoteJoinEntity);
@@ -115,7 +124,7 @@ export class GitManagerService {
   async fetchBranches(remote: Remote): Promise<ApiResponse> {
     try {
       const { stdout, stderr } = await execFileAsync('git', ['-C', remote.path, 'fetch', '--all']);
-    
+
       const { stdout: remoteB, stderr: remoteErr } = await execFileAsync('git', ['-C', remote.path, 'branch', '-a']);
       const { stdout: localB, stderr: branchErr } = await execFileAsync('git', ['-C', remote.path, 'branch']);
       if (branchErr) {

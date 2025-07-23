@@ -227,7 +227,11 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
         .map(line => {
           let staged = false;
           !line.startsWith(' ') && (staged = true)
-
+          
+          if(line.startsWith('??')) {
+            return { status: '??', path: line.split(' ')[1], staged: false };
+          }
+          
           const { status, path } = staged ? { status: line.split(' ')[0], path: line.split(' ')[2] } : { status: line.split(' ')[1], path: line.split(' ')[2] };
           return { status: status, path: path, staged };
         });
@@ -307,7 +311,7 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
       diffCmd.push(filePath);
 
       const { stdout: diff } = await execFileAsync("git", diffCmd);
-      
+
       // 4. 응답
       socket.emit('fetch_conflict_file_diff_response', {
         left,   // 현재 브랜치 파일 내용
@@ -562,12 +566,39 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
         });
       }
 
-
-
       socket.emit('checkout_local_branch_response', { success: false, message: responseMsg, conflictFiles: conflictFiles, branch: branch });
     }
   }
 
+  /** 
+    @param data { remote: Remote, filePath: string }
+    @description 변경 사항 전체 버리기
+  */
+  @SubscribeMessage('discard_all')
+  async handleDiscardAll(
+    @MessageBody() data: { remote: any; filePath: string },
+    @ConnectedSocket() socket: Socket,
+  ) {
+    this.logger.log(`Discard All Changes 요청: ${JSON.stringify(data)}`);
+    const { remote, filePath } = data;
 
+    // TODO: 실제 git checkout -- filePath 로직 호출
+    try {
+      // 예시: discardChanges 함수가 실제 로컬에서 git checkout 실행
+      const { stdout, stderr } = await execFileAsync("git", [
+        "-C", remote.path,
+        "checkout",
+        "--",
+        filePath
+      ]);
+      
+      const { stdout: res }  = await execFileAsync("git", ["-C", remote.path, "clean", "-fd"]);
+      this.logger.log(`Discard All Changes 성공: ${stdout} ${res}`);
+      socket.emit('discard_all_success', { filePath });
+    } catch (error) {
+      this.logger.error('Discard All Error', error);
+      socket.emit('discard_all_error', { filePath, error: error?.message ?? error });
+    }
+  }
 
 }

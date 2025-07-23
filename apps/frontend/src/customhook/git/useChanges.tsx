@@ -17,20 +17,23 @@ export function useChanges(initialUnstaged: File[] = [], initialStaged: File[] =
   const [left, setLeft] = useState<string>('');
   const [right, setRight] = useState<string>('');
 
-  const { selectedRemoteBranch } = useRemoteContext();
+  const { selectedRemoteBranch, selectedRemote } = useRemoteContext();
   const { emit, on, off } = useGitSocket();
+
+  // 선택된 줄 번호 관리 (변경 사항에서)
+  const [selectedLines, setSelectedLines] = useState<number[]>([]);
 
   // 파일 스테이징/언스테이징
   const stageFile = useCallback((file: File) => {
     setUnstagedFiles(prev => prev.filter(f => f.path !== file.path));
     setStagedFiles(prev => [...prev, file]);
     setSelectedFile(file);
-  }, []);
+  }, [selectedRemote]);
   const unstageFile = useCallback((file: File) => {
     setStagedFiles(prev => prev.filter(f => f.path !== file.path));
     setUnstagedFiles(prev => [...prev, file]);
     setSelectedFile(file);
-  }, []);
+  }, [selectedRemote]);
 
   // 파일 선택 (ChangePanel)
   const selectFile = useCallback((file: File, remote: Remote) => {
@@ -39,14 +42,14 @@ export function useChanges(initialUnstaged: File[] = [], initialStaged: File[] =
 
     setFileDiff('');
     setSelectedFile(file);
-  }, []);
+  }, [selectedRemote]);
 
   // 파일 선택 (ConflictModal)
-  const selectConflictFile = useCallback((file: File, remote: Remote, conflictBranch: string, selectedLocalBranch: string) => {    
+  const selectConflictFile = useCallback((file: File, remote: Remote, conflictBranch: string, selectedLocalBranch: string) => {
     emit('fetch_conflict_file_diff', { remote: remote, filePath: file.path, fileStaged: file.staged, conflictBranch, selectedLocalBranch });
     setSelectedFile(file);
     setFileDiff('');
-  }, []);
+  }, [selectedRemote]);
 
   // 커밋
   const commit = useCallback((remote: Remote) => {
@@ -60,13 +63,39 @@ export function useChanges(initialUnstaged: File[] = [], initialStaged: File[] =
 
   }, [stagedFiles, commitMsg]);
 
-
+  // 변경 사항 조회
   const fetchChanges = async (remote: Remote) => {
     setStagedFiles([]);
     setUnstagedFiles([]);
     setFileDiff('');
     emit('fetch_changed_files', remote);
   }
+
+
+
+  // 선택
+  const handleToggleLine = (lineIdx: number) => {
+    setSelectedLines((prev) =>
+      prev.includes(lineIdx)
+        ? prev.filter(idx => idx !== lineIdx)
+        : [...prev, lineIdx]
+    );
+  };
+
+
+  // lines가 없으면 전체, 있으면 부분 discard
+  const onDiscard = (remote: Remote, file: File, lines?: number[]) => {
+    console.log('Discarding file:', file, 'Lines:', lines, 'Remote:', remote);
+    if (!lines) {
+      // 전체 discard 처리 (예: 서버/소켓 emit 등)
+      emit('discard_all', { remote: remote, filePath: file.path });
+    } else {
+      // 선택 줄만 discard (예: 서버/소켓 emit 등)
+      emit('discard_lines', { remote: remote, filePath: file.path, lines });
+    }
+  };
+
+
 
   useEffect(() => {
     // 변경 파일 리스트 조회
@@ -76,9 +105,12 @@ export function useChanges(initialUnstaged: File[] = [], initialStaged: File[] =
         const unstaged: File[] = [];
         data.forEach(({ status, path, staged: isStaged }) => {
           const file = { status, path, name: path, staged: isStaged } as File;
+          if(!file.path) return;
           if (isStaged) staged.push(file);
           else unstaged.push(file);
         });
+        
+        console.log(data);
         setStagedFiles(staged);
         setUnstagedFiles(unstaged);
         setFileDiff('');
@@ -113,7 +145,7 @@ export function useChanges(initialUnstaged: File[] = [], initialStaged: File[] =
     });
 
 
-    on('fetch_conflict_file_diff_response', (data: { left: string, right: string }) => {            
+    on('fetch_conflict_file_diff_response', (data: { left: string, right: string }) => {
       if (data) {
         setLeft(data.left);
         setRight(data.right);
@@ -125,7 +157,7 @@ export function useChanges(initialUnstaged: File[] = [], initialStaged: File[] =
       off('fetch_file_diff_response');
       off('fetch_conflict_file_diff_response');
     }
-  }, [])
+  }, [selectedRemote])
 
   return {
     unstagedFiles, stagedFiles, selectedFile, fileDiff,
@@ -138,6 +170,10 @@ export function useChanges(initialUnstaged: File[] = [], initialStaged: File[] =
     // 충돌 파일 관련
     selectConflictFile,
     left, setLeft,
-    right, setRight
+    right, setRight,
+
+
+    handleToggleLine, onDiscard,
+    selectedLines, setSelectedLines,
   };
 }

@@ -2,19 +2,21 @@ import { useCallback, useEffect } from 'react';
 import type { Remote } from './useRemote';
 import { useGitSocket } from '../../context/GitSocketContext';
 import { showToast } from '../../utils/notifyStore';
+import { useRemoteContext } from '../../context/RemoteContext';
 
 export function useTopActionBar() {
   const { emit, on, off } = useGitSocket();
+  const { selectedRemote } = useRemoteContext();
 
   const push = useCallback((remote: Remote | null, remoteBranch: string) => {
     emit('git_push', { remote, remoteBranch });
     emit('fetch_pull_request_count', { remote: remote, remoteBranch: remoteBranch });
     emit('fetch_commit_count', { remote: remote, remoteBranch: remoteBranch });
-  }, []);
+  }, [selectedRemote]);
 
   const pull = useCallback((remote: Remote | null, remoteBranch: string) => {
     emit('git_pull', { remote, remoteBranch });
-  }, []);
+  }, [selectedRemote]);
 
   const fetch = useCallback(() => { /* fetch 로직 */ }, []);
   const stash = useCallback(() => { /* stash 생성 로직 */ }, []);
@@ -37,8 +39,8 @@ export function useTopActionBar() {
     }
 
     const git_pull_response = (response: {
-      success: boolean, 
-      message: string, 
+      success: boolean,
+      message: string,
       remote: Remote,
       remoteBranch: string
     }) => {
@@ -62,7 +64,7 @@ export function useTopActionBar() {
       off('fetch', fetch);
       off('stash', stash);
     };
-  }, []);
+  }, [selectedRemote]);
 
 
   return { push, pull, fetch, stash };

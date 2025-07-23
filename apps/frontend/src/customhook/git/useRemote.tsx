@@ -30,7 +30,7 @@ export function useRemotes(initial: Remote[] = []) {
     } catch (error) {
       showToast('원격 저장소 추가에 실패했습니다.', 'error');
     }
-  }, []);
+  }, [selectedRemote]);
   const editRemote = useCallback(async (remote: Remote) => {
     try {
       const result = await editRemoteImpl(remote);
@@ -40,7 +40,7 @@ export function useRemotes(initial: Remote[] = []) {
     } catch (error) {
       showToast('원격 저장소 수정에 실패했습니다.', 'error');
     }
-  }, []);
+  }, [selectedRemote]);
   const removeRemote = useCallback(async (remote: Remote) => {
     try {
       await deleteRemoteImpl(remote);
@@ -48,12 +48,12 @@ export function useRemotes(initial: Remote[] = []) {
     } catch (error) {
       showToast('원격 저장소 삭제에 실패했습니다.', 'error');
     }
-  }, []);
+  }, [selectedRemote]);
 
   const selectRemote = useCallback(async (remote: Remote): Promise<boolean> => {
     setSelectedRemote(remote);    
     return true;
-  }, []);
+  }, [selectedRemote]);
 
 
   return { remotes, addRemote, editRemote, removeRemote, setRemotes, selectedRemote, setSelectedRemote, selectRemote };

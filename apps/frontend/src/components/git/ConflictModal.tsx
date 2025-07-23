@@ -3,7 +3,9 @@ import { DiffEditor } from "@monaco-editor/react";
 import type { Remote } from "../../customhook/git/useRemote";
 import type { File } from "../../customhook/git/useChanges";
 import { useRemoteContext } from "../../context/RemoteContext";
-import { FileIcon, Menu as MenuIcon, X as CloseIcon } from "lucide-react";
+import { FileIcon, Menu as MenuIcon, X as CloseIcon, CornerDownLeft, Layers, Trash2 } from "lucide-react";
+import { Tooltip } from "react-tooltip";
+import "react-tooltip/dist/react-tooltip.css";
 
 interface ConflictModalProps {
     open: boolean;
@@ -15,6 +17,8 @@ interface ConflictModalProps {
     branch: string;
     left: string;
     right: string;
+    onGoToCommit: (tab: string) => void;
+    onGoToStash: (tab: string) => void;    
 }
 
 export const ConflictModal: React.FC<ConflictModalProps> = ({
@@ -26,11 +30,12 @@ export const ConflictModal: React.FC<ConflictModalProps> = ({
     setSelectedFile,
     branch,
     left,
-    right
+    right,
+    onGoToCommit,
+    onGoToStash,    
 }) => {
-    const { selectedRemote, selectedLocalBranch } = useRemoteContext();
 
-    // 모바일/좁은 화면 햄버거 메뉴
+    const { selectedRemote, selectedLocalBranch } = useRemoteContext();
     const [showSidebar, setShowSidebar] = useState(false);
 
     useEffect(() => {
@@ -40,7 +45,6 @@ export const ConflictModal: React.FC<ConflictModalProps> = ({
 
     if (!open) return null;
 
-    // 반응형 min-width
     const sidebarWidth = 270;
 
     return (
@@ -91,11 +95,37 @@ export const ConflictModal: React.FC<ConflictModalProps> = ({
                     <div className="font-bold text-gray-600 mb-2 text-sm truncate pl-1">
                         {selectedFile ? selectedFile.path : "파일을 선택하면 변경사항을 미리볼 수 있습니다."}
                     </div>
+                    {/* 브랜치명 라벨 */}
+                    <div className="flex items-center justify-between mb-2 px-2">
+                        <div className="flex-1 text-xs font-semibold text-left">
+                            <span className="text-indigo-500">{selectedLocalBranch}</span>
+                            <span className="ml-2 text-gray-400">(현재 브랜치)</span>
+                        </div>
+                        <div className="flex-1 text-xs font-semibold text-right">
+                            <span className="text-cyan-500">{branch}</span>
+                            <span className="ml-2 text-gray-400">(변경할 브랜치)</span>
+                        </div>
+                    </div>
+
+                    {/* 가이드바 */}
+                    <div className="w-full mb-1 px-3">
+                        <div className="rounded bg-blue-50 text-blue-900 text-xs p-2 mb-2 flex items-center gap-2 shadow-sm">
+                            <span className="font-bold">💡 충돌 해결 TIP:</span>
+                            <span>
+                                <span className="text-blue-700 font-semibold">1) 커밋</span> 또는
+                                <span className="text-violet-700 font-semibold ml-1">2) 스태시</span> 후 브랜치를 전환하거나,
+                                <span className="text-red-700 font-semibold ml-1">3) 변경사항 버리기</span>로 즉시 해결할 수 있습니다.
+                                각 버튼에 <b>마우스를 올리면 설명</b>을 볼 수 있습니다.
+                            </span>
+                        </div>
+                    </div>
+
                     <div className="flex-1 min-h-0">
                         {selectedFile && left && right ? (
                             <DiffEditor
                                 height="100%"
                                 language="html"
+                                loading="로딩 중..."
                                 original={left}
                                 modified={right}
                                 theme="vs-dark"
@@ -111,6 +141,42 @@ export const ConflictModal: React.FC<ConflictModalProps> = ({
                                 {selectedFile ? "변경 내역이 없습니다." : "왼쪽에서 파일을 선택하세요."}
                             </div>
                         )}
+
+                        {/* 모달 하단(버튼 영역, 세련된 + 툴팁) */}
+                        <div className="w-full flex flex-row gap-3 justify-end items-center mt-8 pr-4">
+                            <button
+                                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow transition"
+                                onClick={() => onGoToCommit('commit')}
+                                data-tooltip-id="commit-tip"
+                                data-tooltip-content="수정된 내용을 커밋(저장)할 수 있는 탭으로 이동합니다."
+                            >
+                                <CornerDownLeft size={18} /> 커밋 탭 이동
+                            </button>
+                            <button
+                                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-700 text-white font-semibold shadow transition"
+                                onClick={() => onGoToStash('stash')}
+                                data-tooltip-id="stash-tip"
+                                data-tooltip-content="수정 내역을 임시 저장(스태시)할 수 있는 탭으로 이동합니다."
+                            >
+                                <Layers size={18} /> 스태시 탭 이동
+                            </button>
+                            <button
+                                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-200 hover:bg-red-500 text-gray-900 hover:text-white font-semibold shadow transition"
+                                onClick={() => {
+                                    if (window.confirm("정말 변경사항을 모두 버리시겠습니까? 이 작업은 되돌릴 수 없습니다.")) {
+                                        onGoToCommit('changes');
+                                    }
+                                }}
+                                data-tooltip-id="discard-tip"
+                                data-tooltip-content="현재 작업 내역을 완전히 삭제합니다 (주의!)"
+                            >
+                                <Trash2 size={18} /> 변경사항 버리기
+                            </button>
+                            {/* 툴팁은 한 번만 렌더링해도 OK */}
+                            <Tooltip id="commit-tip" place="top" />
+                            <Tooltip id="stash-tip" place="top" />
+                            <Tooltip id="discard-tip" place="top" />
+                        </div>
                     </div>
                 </div>
 

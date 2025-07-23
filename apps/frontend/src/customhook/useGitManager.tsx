@@ -27,7 +27,7 @@ export const useGitManager = () => {
 
   const [tab, setTab] = useState<tabType>('remotes');
   const { on, off } = useGitSocket();
-  const { setPushCount, setPullCount } = useRemoteContext();
+  const { setPushCount, setPullCount, selectedRemote} = useRemoteContext();
   const { emit } = useGitSocket();
   useEffect(() => {
      
@@ -72,7 +72,7 @@ export const useGitManager = () => {
       off('fetch_pull_request_count_response');
       off('connect_git_response');
     }
-  }, [])
+  }, [selectedRemote])
 
   return {
     tab, setTab,

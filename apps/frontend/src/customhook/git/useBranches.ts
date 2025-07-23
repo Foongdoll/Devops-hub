@@ -8,7 +8,7 @@ export type Branch = { name: string; current?: boolean; fullname?: string };
 export type TrackingBranch = { local: string; remote: string; ahead?: number; behind?: number };
 
 export function useBranches() {
-  const { setLocalBranches, setRemoteBranches, setSelectedLocalBranch, setSelectedRemoteBranch, setConflictModalOpen } = useRemoteContext();
+  const { setLocalBranches, setRemoteBranches, setSelectedLocalBranch, setSelectedRemoteBranch, setConflictModalOpen, selectedRemote } = useRemoteContext();
   const { emit, on, off } = useGitSocket();
   const [conflictFiles, setConflictFiles] = useState<string[]>([]);
   const [conflictBranch, setConflictBranch] = useState<string>('');
@@ -25,7 +25,7 @@ export function useBranches() {
     emit('fetch_pull_request_count', { remote: remote, remoteBranch: result.remote.find(b => b.current)?.name || '' });
     emit('fetch_commit_count', { remote: remote, remoteBranch: result.remote.find(b => b.current)?.name || '' });
     return true;
-  }, []);
+  }, [selectedRemote]);
 
   const selecteLocalBranch = useCallback(async (branch: string, remote: Remote) => {
     if (branch === '') {
@@ -48,7 +48,7 @@ export function useBranches() {
   const selectRemoteBranch = useCallback((branch: string) => {
     // 요청 보내서 checkout 진행해야하고 -vv 로 브랜치 정보 최신화 해줘야함
     setSelectedRemoteBranch(branch);
-  }, []);
+  }, [selectedRemote]);
 
 
   useEffect(() => {
@@ -70,7 +70,7 @@ export function useBranches() {
     return () => {
       off('checkout_local_branch_response');
     }
-  }, []);
+  }, [selectedRemote]);
 
 
 

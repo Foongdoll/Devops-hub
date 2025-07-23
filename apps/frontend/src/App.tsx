@@ -11,6 +11,7 @@ import GitManager from './pages/GitManager';
 import { ThemeProvider } from './context/ThemeProvider';
 import { GitSocketProvider, useGitSocket } from './context/GitSocketContext';
 import { RemoteProvider } from './context/RemoteContext';
+import CustomTitleBar from './components/electron/CustomTitleBar';
 
 const RequireAuth = ({ children }: { children: React.ReactNode }) => {
   const isAuthed = React.useMemo(() => !!localStorage.getItem('accessToken'), []);
@@ -18,6 +19,13 @@ const RequireAuth = ({ children }: { children: React.ReactNode }) => {
 };
 
 
+function isElectron() {
+  // (1) preload에서 isElectron 값을 넘긴 경우
+  if (window.env?.isElectron) return true;
+  // (2) User Agent에 Electron이 있는 경우
+  if (navigator.userAgent.toLowerCase().includes("electron")) return true;
+  return false;
+}
 
 
 const SocketCheck = () => {
@@ -37,6 +45,7 @@ const SocketCheck = () => {
 
 const App = () => (
   <ThemeProvider>
+    {isElectron() && (<CustomTitleBar />) }
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<Login />} />
