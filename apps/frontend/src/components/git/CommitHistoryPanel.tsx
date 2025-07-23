@@ -1,36 +1,29 @@
 import React, { type JSX } from "react";
-import { MoreVertical, GitCommit, GitBranch, Link } from "lucide-react";
+import { MoreVertical, GitBranch, ChevronDown, ChevronRight } from "lucide-react";
 import type { Commit } from "../../customhook/git/useCommitHistory";
 import { useRemoteContext } from "../../context/RemoteContext";
-import { TopBar } from "./GitBranchBar";
+import { TopStageBar } from "./GitBranchBar";
+import type { Remote } from "../../customhook/git/useRemote";
+import type { Branch } from "../../customhook/git/useBranches";
+import { useGitSocket } from "../../context/GitSocketContext";
 
 // props 타입 정의
 export interface CommitHistoryPanelProps {
-  commits: Commit[];
-  commitsWithBranches: Commit[];
+  commits: Map<string, Commit[]>;
+  setCommits: (commits: Map<string, Commit[]>) => void;
   onContextMenu: (commit: Commit, pos: { x: number; y: number }) => void;
   selectedHash?: string | null;
   selectCommit?: (hash: string) => void;
   closeContextMenu?: () => void;
   handleMenuAction?: (action: string, commit: Commit) => void;
-  commitBranches: string[];  
   onSelectBranch?: (branch: string) => void;
+  fetchCommitHistory: (remote: Remote, branches: Branch[]) => void;
+  onSelectLocalBranch: (branch: string, remote: Remote) => void;
+  onSelectRemoteBranch: (branch: string) => void;
 }
 
 const COMMIT_ROW_HEIGHT = 44;
 const GRAPH_WIDTH = 36;
-
-// 브랜치(=refs)만 추출
-function getRefBranches(commits: Commit[]): string[] {
-  const refs = new Set<string>();
-  commits.forEach(commit => {
-    if (commit.refs) {
-      commit.refs.split(",").forEach(ref => refs.add(ref.trim()));
-    }
-  });
-  return Array.from(refs).filter(Boolean);
-}
-
 
 
 // 그래프 SVG 렌더 함수
@@ -92,116 +85,131 @@ function renderGraph(
     </svg>
   );
 }
-
 export const CommitHistoryPanel: React.FC<CommitHistoryPanelProps> = ({
   commits,
+  setCommits,
   onContextMenu,
   selectedHash,
   selectCommit,
   closeContextMenu,
   handleMenuAction,
-  commitBranches,
-  onSelectBranch  
+  onSelectBranch,
+  fetchCommitHistory,
+  onSelectLocalBranch,
+  onSelectRemoteBranch
 }) => {
+  const { localBranches, remoteBranches, selectedRemote, selectedLocalBranch, selectedRemoteBranch } = useRemoteContext();
+  const { on, off } = useGitSocket();
 
-  const { localBranches, remoteBranches, selectedLocalBranch, setSelectedLocalBranch, selectedRemoteBranch, setSelectedRemoteBranch } = useRemoteContext();  
+  // 브랜치별 오픈 상태
+  const [openBranches, setOpenBranches] = React.useState<{ [branch: string]: boolean }>({});
+
+  // 브랜치 토글 함수
+  const toggleBranch = (branchName: string) => {
+    setOpenBranches(prev => ({
+      ...prev,
+      [branchName]: !prev[branchName],
+    }));
+  };
+
+  React.useEffect(() => {
+    if (!selectedRemote || !remoteBranches) return;
+    fetchCommitHistory(selectedRemote, remoteBranches);
+
+    const handler = (commits: Map<string, Commit[]>) => {
+      setCommits(commits);
+    };
+
+    on("fetch_commit_history_response", handler);
+
+    return () => {
+      off("fetch_commit_history_response", handler);
+    };
+  }, [selectedRemote]);
 
   // 인덱스 매핑
-  const hashToIndex = React.useMemo(() => {
-    const map: Record<string, number> = {};
-    commits.forEach((c, i) => { map[c.hash] = i; });
-    return map;
-  }, [commits]);
-
-  // "refs"만 브랜치 옵션
-  const branchOptions = React.useMemo(() => getRefBranches(commits), [commits]);
-
-  // 브랜치 필터 (refs 기준)
-  const filteredCommits = React.useMemo(() => {
-    return commits;
-    // if (!selectedRemoteBranch) return commits;
-    // return commits.filter(commit => commit.refs && commit.refs.includes(selectedRemoteBranch));
-  }, [selectedRemoteBranch, commits]);
+  function makeHashToIndex(commits: Commit[]) {
+    const hashToIndex: Record<string, number> = {};
+    commits.forEach((commit, idx) => {
+      hashToIndex[commit.hash] = idx;
+    });
+    return hashToIndex;
+  }
 
   return (
-    <section className="bg-gray-900 p-4 rounded-2xl shadow flex flex-col gap-0 h-full w-full">
-      {/* 상단 바 */}
-      <TopBar
-        branches={branchOptions}
-        selectedBranch={selectedRemoteBranch}
-        onSelectBranch={onSelectBranch || (() => { })}
-        localBranch={localBranches.map(b => b.current ? b.name : null).join("")}
-        remoteBranch={remoteBranches.map(b => b.current ? b.name : null).join("")}
+    <section className="bg-gray-900 p-4 rounded-2xl shadow flex flex-col gap-4 h-full w-full overflow-auto">
+      <TopStageBar
+        localBranches={localBranches}
+        remoteBranches={remoteBranches}
+        selectedLocalBranch={selectedLocalBranch}
+        selectedRemoteBranch={selectedRemoteBranch}
+        onSelectLocalBranch={onSelectLocalBranch}
+        onSelectRemoteBranch={onSelectRemoteBranch}
+        selectedRemote={selectedRemote || { name: '', url: '' } as Remote}
       />
-
-      {/* 커밋 리스트 */}
-      <div className="flex flex-col gap-1">
-        {filteredCommits.length === 0 && (
-          <div className="text-gray-400 text-center py-12">해당 브랜치의 커밋이 없습니다.</div>
-        )}
-        {filteredCommits.map((commit, i) => (
-          <div
-            key={commit.hash}
-            className={`
-              flex flex-row items-center relative w-full rounded-xl cursor-pointer
-              transition overflow-x-auto gap-2
-              ${selectedHash === commit.hash
-                ? "bg-blue-950 text-blue-300 ring-2 ring-blue-400"
-                : "bg-gray-800 text-gray-200 hover:bg-gray-700"
-              }
-            `}
-            style={{ minHeight: COMMIT_ROW_HEIGHT, height: COMMIT_ROW_HEIGHT }}
-            onClick={() => selectCommit?.(commit.hash)}
-            onContextMenu={e => {
-              e.preventDefault();
-              onContextMenu(commit, { x: e.clientX, y: e.clientY });
-            }}
-          >
-            {/* 그래프 SVG */}
+      {Object.entries(commits).map(([branchName, commitList]: [string, Commit[]]) => {
+        const hashToIndex = makeHashToIndex(commitList);
+        const open = openBranches[branchName] ?? true; // 기본 true로 펼쳐짐
+        return (
+          <div key={branchName} className="mb-4">
             <div
-              className="flex items-center justify-center flex-shrink-0"
-              style={{ width: GRAPH_WIDTH, height: COMMIT_ROW_HEIGHT }}
+              className="flex items-center mb-2 cursor-pointer select-none width-fit"
+              onClick={() => toggleBranch(branchName)}
             >
-              {renderGraph(i, commit, hashToIndex, selectedHash ?? null)}
+              {open ? (
+                <ChevronDown size={20} className="mr-1 text-cyan-300 transition" />
+              ) : (
+                <ChevronRight size={20} className="mr-1 text-cyan-300 transition" />
+              )}
+              <GitBranch size={18} className="mr-2 text-cyan-300" />
+              <span className="font-bold text-base text-cyan-200">{branchName}</span>
             </div>
+            {open && (
+              <div className="flex flex-col gap-0 border-l border-gray-800 pl-4">
+                {commitList.map((commit, idx) => (
+                  <div
+                    key={commit.hash}
+                    className={`relative flex items-center group hover:bg-slate-800 cursor-pointer rounded transition`}
+                    style={{ minHeight: COMMIT_ROW_HEIGHT + 8, height: COMMIT_ROW_HEIGHT + 8, paddingTop: 6, paddingBottom: 6 }}
+                    onClick={() => selectCommit?.(commit.hash)}
+                    onContextMenu={e => {
+                      e.preventDefault();
+                      onContextMenu(commit, { x: e.clientX, y: e.clientY });
+                    }}
+                  >
 
-            {/* 커밋 메시지 (왼쪽 확장, 나머지는 오른쪽) */}
-            <div className="flex flex-row items-center w-full min-w-0">
-              <GitCommit className="w-4 h-4 text-gray-400 flex-shrink-0 mr-1" />
-              {commit.refs ? (
-                <span className="mr-2 bg-blue-900 text-blue-400 text-xs px-2 py-0.5 rounded-full font-mono truncate max-w-[120px]">{commit.refs}</span>
-              ) : null}
-              <span className="truncate font-semibold text-base flex-grow min-w-0 pr-2"
-                style={{ maxWidth: "100%" }}
-                title={commit.message}
-              >
-                {commit.message}
-              </span>
-            </div>
+                    <div style={{ width: GRAPH_WIDTH, minWidth: GRAPH_WIDTH, marginRight: 10 }}>
+                      {renderGraph(idx, commit, hashToIndex, selectedHash ?? null)}
+                    </div>
+                    <div className="flex flex-col flex-grow min-w-0">
+                      <span className={`font-mono text-xs truncate ${selectedHash === commit.hash ? 'text-blue-400' : 'text-gray-300'}`}>
+                        {commit.hash.slice(0, 8)}
+                      </span>
+                      <span className="text-sm text-gray-100 truncate">
+                        {commit.message}
+                        {/* 맨 왼쪽에 refs 표시 */}
+                        {commit.refs && (
+                          <span className="mr-3 ml-1 px-2 py-0.5 text-xs rounded bg-purple-950 text-purple-300 whitespace-nowrap flex-shrink-0 ml-2">
+                            {commit.refs}
+                          </span>
+                        )}
+                      </span>
+                      <span className="text-xs text-gray-400">{commit.author} / {new Date(commit.date).toLocaleString()}</span>
+                    </div>
+                    {/* 더보기/메뉴 */}
+                    {handleMenuAction && (
+                      <div className="ml-auto pr-3">
+                        <MoreVertical size={18} onClick={e => { e.stopPropagation(); handleMenuAction("menu", commit); }} />
+                      </div>
+                    )}
+                  </div>
+                ))}
 
-            {/* 오른쪽 정보 (이름, 날짜, 해시, 브랜치) */}
-            <div className="flex flex-row items-center gap-3 flex-shrink-0 justify-end ml-2 min-w-[200px]">
-              <span className="text-xs text-gray-400 max-w-[90px] truncate">{commit.author}</span>
-              <span className="text-xs text-gray-400">{commit.date.slice(0, 10)}</span>
-              <span className="font-mono text-gray-500 text-xs">{commit.hash.slice(0, 8)}</span>
-            </div>
-
-            {/* More 버튼 */}
-            <button
-              className="ml-2 p-2 rounded-full hover:bg-gray-700 transition flex-shrink-0"
-              onClick={e => {
-                e.preventDefault();
-                e.stopPropagation();
-                onContextMenu(commit, { x: e.currentTarget.getBoundingClientRect().right, y: e.currentTarget.getBoundingClientRect().bottom });
-              }}
-              title="More actions"
-              tabIndex={-1}
-            >
-              <MoreVertical className="w-4 h-4 text-gray-400" />
-            </button>
+              </div>
+            )}
           </div>
-        ))}
-      </div>
+        );
+      })}
     </section>
   );
 };

@@ -5,9 +5,13 @@ import ChangesPanel from "../components/git/ChangesPanel";
 import StashPanel from "../components/git/StashPanel";
 import { useGitManager } from "../customhook/useGitManager";
 import { CommitHistoryPanel } from "../components/git/CommitHistoryPanel";
+import { ConflictModal } from "../components/git/ConflictModal";
+import { useRemoteContext } from "../context/RemoteContext";
 
 const GitManager = () => {
   const git = useGitManager(); // 커스텀 훅에서 전부 가져오기
+  const { conflictModalOpen, setConflictModalOpen } = useRemoteContext();
+
 
   return (
     <div className="flex flex-col w-full h-full bg-gray-950 text-gray-100">
@@ -16,7 +20,7 @@ const GitManager = () => {
           onPush={git.push}
           onPull={git.pull}
           onFetch={git.fetch}
-          onStash={git.stash}          
+          onStash={git.stash}
         />
       </TabNav>
 
@@ -24,15 +28,17 @@ const GitManager = () => {
       <main className="flex-1 overflow-y-auto">
         {git.tab === "history" && (
           <CommitHistoryPanel
-            commits={git.commits}            
-            commitsWithBranches={git.commitsWithBranches}
+            commits={git.commits}
+            setCommits={git.setCommits}
             onContextMenu={git.openContextMenu}
             selectedHash={git.selectedHash}
             selectCommit={git.selectCommit}
             closeContextMenu={git.closeContextMenu}
-            handleMenuAction={git.handleMenuAction}            
-            commitBranches={git.commitBranches}     
-            onSelectBranch={git.selecteRemoteBranch}
+            handleMenuAction={git.handleMenuAction}
+            onSelectBranch={git.selectRemoteBranch}
+            fetchCommitHistory={git.fetchCommitHistory}
+            onSelectLocalBranch={git.selecteLocalBranch}
+            onSelectRemoteBranch={git.selectRemoteBranch}
           />
         )}
         {git.tab === "remotes" && (
@@ -60,7 +66,7 @@ const GitManager = () => {
             onCommit={git.commit}
             fetchChanges={git.fetchChanges}
             onSelectLocalBranch={git.selecteLocalBranch}
-            onSelectRemoteBranch={git.selecteRemoteBranch}
+            onSelectRemoteBranch={git.selectRemoteBranch}
           />
         )}
         {/* {git.tab === "branches" && (
@@ -85,6 +91,17 @@ const GitManager = () => {
             diff={git.stashDiff}
           />
         )}
+        <ConflictModal
+          open={conflictModalOpen}
+          onClose={() => setConflictModalOpen(false)}
+          conflictFiles={git.conflictFiles}     
+          onSelectConflictFile={git.selectConflictFile}
+          selectedFile={git.selectedFile}     
+          setSelectedFile={git.setSelectedFile}     
+          branch={git.conflictBranch}
+          left={git.left}
+          right={git.right}
+        />
       </main>
     </div>
   );

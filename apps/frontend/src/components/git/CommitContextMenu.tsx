@@ -1,6 +1,6 @@
 import React from "react";
 import { Check, Code, GitBranch, Copy, Trash2, Code2, Archive } from "lucide-react";
-import type { Commit } from "./CommitHistoryPanel";
+import type { Commit } from "../../customhook/git/useCommitHistory";
 
 export interface CommitContextMenuProps {
   commit: Commit;

@@ -13,6 +13,10 @@ export function useChanges(initialUnstaged: File[] = [], initialStaged: File[] =
   const [fileDiff, setFileDiff] = useState<string>('');
   const [commitMsg, setCommitMsg] = useState('');
 
+  // 충돌 파일 left, right 비교 변수
+  const [left, setLeft] = useState<string>('');
+  const [right, setRight] = useState<string>('');
+
   const { selectedRemoteBranch } = useRemoteContext();
   const { emit, on, off } = useGitSocket();
 
@@ -28,12 +32,20 @@ export function useChanges(initialUnstaged: File[] = [], initialStaged: File[] =
     setSelectedFile(file);
   }, []);
 
-  // 파일 선택
+  // 파일 선택 (ChangePanel)
   const selectFile = useCallback((file: File, remote: Remote) => {
+
     emit('fetch_file_diff', { remote: remote, filePath: file.path, fileStaged: file.staged });
 
     setFileDiff('');
     setSelectedFile(file);
+  }, []);
+
+  // 파일 선택 (ConflictModal)
+  const selectConflictFile = useCallback((file: File, remote: Remote, conflictBranch: string, selectedLocalBranch: string) => {    
+    emit('fetch_conflict_file_diff', { remote: remote, filePath: file.path, fileStaged: file.staged, conflictBranch, selectedLocalBranch });
+    setSelectedFile(file);
+    setFileDiff('');
   }, []);
 
   // 커밋
@@ -99,18 +111,33 @@ export function useChanges(initialUnstaged: File[] = [], initialStaged: File[] =
         // console.error(response.message);
       }
     });
+
+
+    on('fetch_conflict_file_diff_response', (data: { left: string, right: string }) => {            
+      if (data) {
+        setLeft(data.left);
+        setRight(data.right);
+      }
+    });
+
     return () => {
       off('fetch_changed_files_response');
       off('fetch_file_diff_response');
+      off('fetch_conflict_file_diff_response');
     }
   }, [])
 
   return {
     unstagedFiles, stagedFiles, selectedFile, fileDiff,
-    stageFile, unstageFile, selectFile,
+    stageFile, unstageFile, selectFile, setSelectedFile,
     commitMsg, setCommitMsg, commit,
     setUnstagedFiles, setStagedFiles,
 
     fetchChanges,
+
+    // 충돌 파일 관련
+    selectConflictFile,
+    left, setLeft,
+    right, setRight
   };
 }

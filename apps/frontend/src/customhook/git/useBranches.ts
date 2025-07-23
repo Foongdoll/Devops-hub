@@ -8,13 +8,14 @@ export type Branch = { name: string; current?: boolean; fullname?: string };
 export type TrackingBranch = { local: string; remote: string; ahead?: number; behind?: number };
 
 export function useBranches() {
-  const { setLocalBranches, setRemoteBranches, setSelectedLocalBranch, setSelectedRemoteBranch } = useRemoteContext();
+  const { setLocalBranches, setRemoteBranches, setSelectedLocalBranch, setSelectedRemoteBranch, setConflictModalOpen } = useRemoteContext();
   const { emit, on, off } = useGitSocket();
+  const [conflictFiles, setConflictFiles] = useState<string[]>([]);
+  const [conflictBranch, setConflictBranch] = useState<string>('');
+
   const fetchBranches = useCallback(async (remote: Remote) => {
     const result = await fetchBranchesImpl(remote) as { local: Branch[], remote: Branch[], tracking: TrackingBranch[] };
     if (!result) return false;
-
-
 
     setLocalBranches(result.local);
     setRemoteBranches(result.remote);
@@ -30,7 +31,7 @@ export function useBranches() {
     if (branch === '') {
       showToast('브랜치를 선택해주세요.', 'error');
       return;
-    }     
+    }
 
     // // 요청 보내서 checkout 진행해야하고 -vv 로 브랜치 정보 최신화 해줘야함    
     // const result = await showConfirm('로컬 브랜치 경고', `로컬 브랜치가 달라지면 현재 작업 중인 내용이 사라지거나 충돌이 발생할 수 있습니다. 
@@ -41,23 +42,29 @@ export function useBranches() {
     // if (!result[0] || !result[1]) return;
     if (!remote) return;
 
-    emit('checkout_local_branch', { branch, selectedRemoteBranch: '', remote });
-    emit('fetch_changed_files', { remote });
-    setSelectedLocalBranch(branch);
+    emit('checkout_local_branch', { branch, selectedRemoteBranch: '', remote });    
   }, []);
 
-  const selecteRemoteBranch = useCallback((branch: string) => {
+  const selectRemoteBranch = useCallback((branch: string) => {
     // 요청 보내서 checkout 진행해야하고 -vv 로 브랜치 정보 최신화 해줘야함
     setSelectedRemoteBranch(branch);
   }, []);
 
 
   useEffect(() => {
-    on('checkout_local_branch_response', (data: { success: boolean; message: string }) => {
+    on('checkout_local_branch_response', (data: { success: boolean; message: string, branch: string, conflictFiles: string[], remote? : Remote}) => {
+      console.log("checkout_local_branch_response", data);
       if (data.success) {
         showToast('로컬 브랜치 변경 성공', 'success');
+        setSelectedLocalBranch(data.branch);
+        emit('fetch_changed_files', { remote: data.remote });
       } else {
-        showToast(`로컬 브랜치 변경 실패: ${data.message}`, 'error');
+        showToast(`${data.message}`, 'error');
+        if (data.conflictFiles.length > 0) {
+          setConflictFiles(data.conflictFiles);
+          setConflictModalOpen(true);        
+          setConflictBranch(data.branch);  
+        }
       }
     })
     return () => {
@@ -71,6 +78,12 @@ export function useBranches() {
     // 브랜치 설정
     fetchBranches,
     selecteLocalBranch,
-    selecteRemoteBranch
+    selectRemoteBranch,
+
+    // 충돌 관련
+    conflictFiles,
+    setConflictFiles,
+    conflictBranch,
+    setConflictBranch
   };
 }

@@ -16,8 +16,8 @@ export const TopBar: React.FC<{
 }) => (
         <div className="flex items-center justify-between gap-2 mb-4 w-full px-1 flex-wrap">
             <div className="flex items-center gap-2 mb-1 flex-shrink-0">
-                <GitBranch size={18} className="text-purple-400" />
-                <select
+                {/* <GitBranch size={18} className="text-purple-400" /> */}
+                {/* <select
                     className="bg-gray-800 border border-gray-700 rounded-lg text-gray-100 px-2 py-1 min-w-[110px] outline-none focus:ring-2 focus:ring-blue-500"
                     value={selectedBranch}
                     onChange={e => onSelectBranch(e.target.value)}
@@ -26,7 +26,7 @@ export const TopBar: React.FC<{
                     {branches.map(b => (
                         <option key={b} value={b}>{b}</option>
                     ))}
-                </select>
+                </select> */}
             </div>
             <div className="flex items-center gap-2 text-xs bg-[#232347] rounded-xl px-3 py-1">
                 <span>로컬: <b className="text-blue-400">{localBranch || "?"}</b></span>
