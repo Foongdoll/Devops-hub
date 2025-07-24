@@ -1,11 +1,19 @@
-type Notify = { 
-  message: string; 
-  type: 'success' | 'error' | 'info' | 'warn' | 'loading' | 'loading-hide'; // 'loading', 'loading-hide' 추가
+// notifyStore.ts
+import type { ConfirmOptions } from "../context/GlobalUIContext";
+
+type Notify = {
+  message: string;
+  description?: string;
+  options?: ConfirmOptions;
+  type: 'success' | 'error' | 'info' | 'warn' | 'loading' | 'loading-hide' | 'confirm';
+  resolve?: (value: [boolean, any?]) => void; // confirm에서만 사용
 };
 
-let listeners: ((msg: Notify) => void)[] = [];
+type Listener = (msg: Notify) => void;
 
-export function subscribe(fn: (msg: Notify) => void) {
+let listeners: Listener[] = [];
+
+export function subscribe(fn: Listener) {
   listeners.push(fn);
   return () => { listeners = listeners.filter(l => l !== fn); };
 }
@@ -14,9 +22,17 @@ export function showToast(message: string, type: Notify['type']) {
   listeners.forEach(fn => fn({ message, type }));
 }
 
-export function showLoading({message = "로딩 중..."}: { message?: string } = {}) {
+export function showLoading({ message = "로딩 중..." }: { message?: string } = {}) {
   listeners.forEach(fn => fn({ message, type: 'loading' }));
 }
 export function hideLoading() {
   listeners.forEach(fn => fn({ message: "", type: 'loading-hide' }));
+}
+
+export function showConfirm(message: string, description?: string, options?: ConfirmOptions) {
+  return new Promise<[boolean, any?]>((resolve) => {
+    listeners.forEach(fn =>
+      fn({ message, description, options, type: 'confirm', resolve })
+    );
+  });
 }

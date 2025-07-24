@@ -10,7 +10,7 @@ import { useRemoteContext } from "../context/RemoteContext";
 
 const GitManager = () => {
   const git = useGitManager(); // 커스텀 훅에서 전부 가져오기
-  const { conflictModalOpen, setConflictModalOpen } = useRemoteContext();
+  const { conflictModalOpen, setConflictModalOpen, } = useRemoteContext();
 
 
   return (
@@ -67,6 +67,10 @@ const GitManager = () => {
             fetchChanges={git.fetchChanges}
             onSelectLocalBranch={git.selecteLocalBranch}
             onSelectRemoteBranch={git.selectRemoteBranch}
+            onDiscard={git.onDiscard}
+            onSelectedLines={git.setSelectedLines}
+            selectedLines={git.selectedLines}
+            handleToggleLine={git.handleToggleLine}
           />
         )}
         {/* {git.tab === "branches" && (
@@ -94,13 +98,18 @@ const GitManager = () => {
         <ConflictModal
           open={conflictModalOpen}
           onClose={() => setConflictModalOpen(false)}
-          conflictFiles={git.conflictFiles}     
+          conflictFiles={git.conflictFiles}
           onSelectConflictFile={git.selectConflictFile}
-          selectedFile={git.selectedFile}     
-          setSelectedFile={git.setSelectedFile}     
+          selectedFile={git.selectedFile}
+          setSelectedFile={git.setSelectedFile}
           branch={git.conflictBranch}
           left={git.left}
           right={git.right}
+          onCheckoutConflictFilesCommit={git.onCheckoutRemoteBranch}
+          onCheckoutConflictFilesStash={git.onCheckoutConflictFilesStash}
+          onCheckoutConflictFilesDiscard={git.onCheckoutConflictFilesDiscard}
+          socketResponse={git.socketResponse}
+          setSocketResponse={git.setSocketResponse}
         />
       </main>
     </div>

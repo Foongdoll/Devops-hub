@@ -3,12 +3,13 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 import type { ReactNode } from "react";
 import { subscribe } from "../utils/notifyStore";
 
-interface ConfirmOptions {
+export interface ConfirmOptions {
   confirmText?: string;
   cancelText?: string;
   danger?: boolean;
   select?: boolean;
   data?: any;
+  checkbox?: { label: string; value?: boolean }; // 추가
 }
 
 interface GlobalUIContextProps {
@@ -41,17 +42,25 @@ export function GlobalUIProvider({ children }: { children: ReactNode }) {
     resolve?: (value: [boolean, any]) => void;
   }>({ open: false, message: "" });
   const [data, setData] = useState<any>(null);
+  const [checkbox, setCheckbox] = useState<boolean>(
+    confirmState.options?.checkbox?.value ?? false
+  );
 
   // 여기서 구독해서 notifyStore의 showToast 호출을 실제로 "받아" 처리합니다.
   useEffect(() => {
     const unsubscribe = subscribe(({ message, type }) => {
       if (type === 'loading') setLoading(true);
       else if (type === 'loading-hide') setLoading(false);
+      else if (type === 'confirm') {
+        showConfirm(message, confirmState.description || "", confirmState.options || {})
+      }
       else {
         setToast({ message, type: type as any });
         setTimeout(() => setToast(null), 3000);
       }
     });
+    setData(null);
+    setCheckbox(confirmState.options?.checkbox?.value ?? false);
     return unsubscribe;
   }, []);
 
@@ -65,15 +74,12 @@ export function GlobalUIProvider({ children }: { children: ReactNode }) {
   };
 
   const handleConfirm = (result: boolean) => {
-    if (result) {
-      confirmState.resolve?.([true, data]);
-    } else {
-      confirmState.resolve?.([false, undefined]);
-    }
-    setData(null);
+    // data, checkbox 결과 같이 반환
+    confirmState.resolve?.([result, confirmState.options?.select ? data : confirmState.options?.checkbox ? checkbox : null]);
     setConfirmState({ open: false, message: "" });
+    setData(null);
+    setCheckbox(false);
   };
-
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' | 'warn') => {
     setToast({ message, type });
@@ -155,7 +161,6 @@ export function GlobalUIProvider({ children }: { children: ReactNode }) {
           </div>
         )}
 
-
         {confirmState.open && (
           <div className="fixed inset-0 z-[1000] bg-black/30 flex items-center justify-center">
             <div className="bg-white rounded-2xl p-8 min-w-[320px] max-w-xs shadow-xl border border-[#e0e0f0] flex flex-col gap-4 animate-fade-in-up">
@@ -174,6 +179,19 @@ export function GlobalUIProvider({ children }: { children: ReactNode }) {
                   ))}
                 </select>
               )}
+
+              {confirmState.options?.checkbox && (
+                <label className="flex items-center gap-2 mt-2 select-none cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={checkbox}
+                    onChange={e => setCheckbox(e.target.checked)}
+                    className="w-4 h-4 accent-[#7e4cff]"
+                  />
+                  <span className="text-sm text-gray-700">{confirmState.options.checkbox.label}</span>
+                </label>
+              )}
+
               <div className="flex gap-2 mt-2 justify-end">
                 <button
                   className="px-4 py-1.5 rounded-lg font-semibold border bg-gray-100 hover:bg-gray-200 text-gray-700"

@@ -67,7 +67,7 @@ export const TopStageBar: React.FC<{
                 >
                     <option value="">로컬 브랜치 선택</option>
                     {localBranches.map(b => (
-                        <option key={b.name} value={b.name} selected={b.current}>{b.name}</option>
+                        <option key={b.name} value={b.name} >{b.name}</option>
                     ))}
                 </select>
                 <span className="text-gray-400 mx-2">→</span>
@@ -80,7 +80,7 @@ export const TopStageBar: React.FC<{
                 >
                     <option value="">리모트 브랜치 선택</option>
                     {remoteBranches.map(b => (
-                        <option key={b.name} value={b.name} selected={b.current}>{b.name}</option>
+                        <option key={b.name} value={b.name}>{b.name}</option>
                     ))}
                 </select>
             </div>

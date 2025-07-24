@@ -4,6 +4,7 @@ import { useRemoteContext } from "../../context/RemoteContext";
 import type { Remote } from "./useRemote";
 import { fetchCounts } from "../useGitManager";
 import type { Branch } from "./useBranches";
+import { showLoading } from "../../utils/notifyStore";
 
 // 커밋 타입
 export interface Commit {
@@ -30,25 +31,25 @@ export const useCommitHistory = () => {
   // 컨텍스트 메뉴(우클릭) 상태
   const [menu, setMenu] = useState<ContextMenuState | null>(null);
 
-  // 소켓 이벤트 리스너 등록
-  
-  // 커밋 히스토리 불러오기
-  const fetchCommitHistory = useCallback((remote: Remote, branches: Branch[]) => {        
-        
-    emit("fetch_commit_history", { remote, branches });
-  }, [socket]);
+  const { selectedRemote } = useRemoteContext();
 
-  
+  // 커밋 히스토리 불러오기
+  const fetchCommitHistory = useCallback((remote: Remote, branches: Branch[]) => {
+    showLoading({ message: "Commit history loading..." });
+    emit("fetch_commit_history", { remote, branches });
+  }, [socket, selectedRemote]);
+
+
 
   // 커밋 선택
   const selectCommit = useCallback((hash: string) => {
     setSelectedHash(hash);
-  }, []);
+  }, [socket, selectedRemote]);
 
   // 컨텍스트 메뉴 열기
   const openContextMenu = useCallback((commit: Commit, pos: { x: number; y: number }) => {
     setMenu({ commit, pos });
-  }, []);
+  }, [socket, selectedRemote]);
 
   // 컨텍스트 메뉴 닫기
   const closeContextMenu = useCallback(() => setMenu(null), []);
@@ -68,7 +69,7 @@ export const useCommitHistory = () => {
   }, [closeContextMenu]);
 
 
- 
+
 
 
   return {
@@ -85,6 +86,6 @@ export const useCommitHistory = () => {
 
     // 커밋 히스토리 가져오기
     fetchCommitHistory,
-    
+
   };
 };

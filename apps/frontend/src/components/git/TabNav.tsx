@@ -1,6 +1,7 @@
 import { Cloud, List, GitBranch, Inbox, History } from 'lucide-react';
 import { showToast } from '../../utils/notifyStore';
 import type { Remote } from '../../customhook/git/useRemote';
+import { useRemoteContext } from '../../context/RemoteContext';
 
 const tabs = [
   { key: 'remotes', icon: <Cloud />, label: 'Remotes' },
@@ -18,6 +19,7 @@ export interface TabNavProps {
 }
 
 const TabNav: React.FC<TabNavProps> = ({ active, onChange, children, selectedRemote }) => {
+  const { setSelectedRemote } =  useRemoteContext();
   return (
     <nav className="flex items-center justify-between px-6 py-2 border-b border-gray-800 bg-gray-900">
       {/* 왼쪽: 탭 목록 */}
@@ -31,6 +33,7 @@ const TabNav: React.FC<TabNavProps> = ({ active, onChange, children, selectedRem
             onClick={() => {
               // 리모트가 선택되어 있을 때만 탭 변경
               if (selectedRemote) {
+                if(tab.key === "remotes") setSelectedRemote(null);
                 onChange(tab.key as any);
               } else {
                 showToast('먼저 리모트를 선택해주세요.', 'warn');

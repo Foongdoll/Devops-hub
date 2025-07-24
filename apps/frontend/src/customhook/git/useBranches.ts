@@ -4,14 +4,16 @@ import { fetchBranchesImpl } from '../../services/GitManagerService';
 import { useRemoteContext } from '../../context/RemoteContext';
 import { useGitSocket } from '../../context/GitSocketContext';
 import { showToast } from '../../utils/notifyStore';
+import type { File } from './useChanges';
 export type Branch = { name: string; current?: boolean; fullname?: string };
 export type TrackingBranch = { local: string; remote: string; ahead?: number; behind?: number };
 
 export function useBranches() {
-  const { setLocalBranches, setRemoteBranches, setSelectedLocalBranch, setSelectedRemoteBranch, setConflictModalOpen } = useRemoteContext();
+  const { setLocalBranches, setRemoteBranches, setSelectedLocalBranch, setSelectedRemoteBranch, setConflictModalOpen, selectedRemote, conflictModalOpen } = useRemoteContext();
   const { emit, on, off } = useGitSocket();
-  const [conflictFiles, setConflictFiles] = useState<string[]>([]);
+  const [conflictFiles, setConflictFiles] = useState<File[]>([]);
   const [conflictBranch, setConflictBranch] = useState<string>('');
+  
 
   const fetchBranches = useCallback(async (remote: Remote) => {
     const result = await fetchBranchesImpl(remote) as { local: Branch[], remote: Branch[], tracking: TrackingBranch[] };
@@ -25,7 +27,7 @@ export function useBranches() {
     emit('fetch_pull_request_count', { remote: remote, remoteBranch: result.remote.find(b => b.current)?.name || '' });
     emit('fetch_commit_count', { remote: remote, remoteBranch: result.remote.find(b => b.current)?.name || '' });
     return true;
-  }, []);
+  }, [selectedRemote]);
 
   const selecteLocalBranch = useCallback(async (branch: string, remote: Remote) => {
     if (branch === '') {
@@ -48,12 +50,11 @@ export function useBranches() {
   const selectRemoteBranch = useCallback((branch: string) => {
     // 요청 보내서 checkout 진행해야하고 -vv 로 브랜치 정보 최신화 해줘야함
     setSelectedRemoteBranch(branch);
-  }, []);
+  }, [selectedRemote]);
 
 
   useEffect(() => {
-    on('checkout_local_branch_response', (data: { success: boolean; message: string, branch: string, conflictFiles: string[], remote? : Remote}) => {
-      console.log("checkout_local_branch_response", data);
+    on('checkout_local_branch_response', (data: { success: boolean; message: string, branch: string, conflictFiles: File[], remote? : Remote}) => {      
       if (data.success) {
         showToast('로컬 브랜치 변경 성공', 'success');
         setSelectedLocalBranch(data.branch);
@@ -70,7 +71,7 @@ export function useBranches() {
     return () => {
       off('checkout_local_branch_response');
     }
-  }, []);
+  }, [conflictModalOpen]);
 
 
 

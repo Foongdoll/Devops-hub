@@ -1,4 +1,4 @@
-import React, { type JSX } from "react";
+import React, { useEffect, type JSX } from "react";
 import { MoreVertical, GitBranch, ChevronDown, ChevronRight } from "lucide-react";
 import type { Commit } from "../../customhook/git/useCommitHistory";
 import { useRemoteContext } from "../../context/RemoteContext";
@@ -6,6 +6,7 @@ import { TopStageBar } from "./GitBranchBar";
 import type { Remote } from "../../customhook/git/useRemote";
 import type { Branch } from "../../customhook/git/useBranches";
 import { useGitSocket } from "../../context/GitSocketContext";
+import { hideLoading } from "../../utils/notifyStore";
 
 // props 타입 정의
 export interface CommitHistoryPanelProps {
@@ -112,12 +113,31 @@ export const CommitHistoryPanel: React.FC<CommitHistoryPanelProps> = ({
     }));
   };
 
+
+  const { setPushCount, setPullCount } = useRemoteContext();  
+  useEffect(() => {
+    const fetch_commit_count_response = (data: { count: number }) => {
+      setPushCount(data.count);
+    }
+
+    const fetch_pull_request_count_response = (data: { count: number }) => {
+      setPullCount(data.count);
+    }
+    on('fetch_commit_count_response', fetch_commit_count_response)
+    on('fetch_pull_request_count_response', fetch_pull_request_count_response)
+    return () => {
+      off('fetch_commit_count_response');
+      off('fetch_pull_request_count_response');
+    }
+  }, [])
+  
   React.useEffect(() => {
     if (!selectedRemote || !remoteBranches) return;
     fetchCommitHistory(selectedRemote, remoteBranches);
 
     const handler = (commits: Map<string, Commit[]>) => {
       setCommits(commits);
+      hideLoading();
     };
 
     on("fetch_commit_history_response", handler);
