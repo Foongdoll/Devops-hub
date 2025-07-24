@@ -20,6 +20,7 @@ interface ConflictModalProps {
     onCheckoutConflictFilesCommit: (remote: Remote, conflictFiles: File[], isPush: boolean, remoteBranch: string) => void;
     onCheckoutConflictFilesStash: (remote: Remote, conflictFiles: File[]) => void;
     onCheckoutConflictFilesDiscard: (remote: Remote, conflictFiles: File[], selectedLocalBranch: string) => void;
+    socketResponse: boolean;
 }
 
 export const ConflictModal: React.FC<ConflictModalProps> = ({
@@ -34,7 +35,8 @@ export const ConflictModal: React.FC<ConflictModalProps> = ({
     right,
     onCheckoutConflictFilesCommit,
     onCheckoutConflictFilesStash,
-    onCheckoutConflictFilesDiscard
+    onCheckoutConflictFilesDiscard,
+    socketResponse
 }) => {
 
     const { selectedRemote, selectedLocalBranch, selectedRemoteBranch } = useRemoteContext();
@@ -98,6 +100,7 @@ export const ConflictModal: React.FC<ConflictModalProps> = ({
                         isPush={isPush}
                         setIsPush={setIsPush}
                         selectedRemoteBranch={selectedRemoteBranch}
+                        socketResponse={socketResponse}
                     />
                 </div>
 
@@ -205,6 +208,7 @@ export const ConflictModal: React.FC<ConflictModalProps> = ({
                                 isPush={isPush}
                                 setIsPush={setIsPush}
                                 selectedRemoteBranch={selectedRemoteBranch}
+                                socketResponse={socketResponse}
                             />
                         </div>
                         <div className="flex-1" onClick={() => setShowSidebar(false)} />
@@ -232,6 +236,7 @@ interface TitleAndFilesProps {
     isPush: boolean;
     setIsPush: (isPush: boolean) => void;
     selectedRemoteBranch: string
+    socketResponse: boolean;
 }
 
 function TitleAndFiles({
@@ -250,7 +255,8 @@ function TitleAndFiles({
     onCheckoutConflictFilesDiscard,
     selectedRemoteBranch,
     isPush,
-    setIsPush
+    setIsPush,
+    socketResponse
 }: TitleAndFilesProps) {
     // 체크/언체크
     const handleCheckboxChange = (file: File, checked: boolean) => {
@@ -275,6 +281,17 @@ function TitleAndFiles({
             setSelectedConflictFiles([...conflictFiles]);
         }
     };
+
+    useEffect(() => {
+        if (socketResponse) {
+            if (setSelectedConflictFiles) {
+                setSelectedConflictFiles([]);
+            }
+            setSelectedFile(null);
+            if (onCloseSidebar) onCloseSidebar();
+        }
+
+    }, [socketResponse]);
 
     return (
         <>
