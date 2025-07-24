@@ -5,6 +5,7 @@ import { useRemoteContext } from '../../context/RemoteContext';
 import type { Remote } from '../../customhook/git/useRemote';
 import { TopStageBar } from './GitBranchBar';
 import { Tooltip } from 'react-tooltip';
+import { useGitSocket } from '../../context/GitSocketContext';
 
 
 export interface ChangesPanelProps {
@@ -44,7 +45,8 @@ const ChangesPanel: React.FC<ChangesPanelProps> = ({
 }) => {
 
   const { selectedRemote, selectedLocalBranch, selectedRemoteBranch, localBranches, remoteBranches } = useRemoteContext();
-  const [isPush, setIsPush] = useState(false);  
+  const [isPush, setIsPush] = useState(false); 
+  const { emit } = useGitSocket();
 
   useEffect(() => {
     // 초기 로드 시 변경 사항 가져오기    
@@ -283,7 +285,7 @@ const ChangesPanel: React.FC<ChangesPanelProps> = ({
             <span className="ml-1 text-gray-200">커밋 후 바로 푸시</span>
           </label>
           <button
-            onClick={() => selectedRemote && onCommit(selectedRemote, isPush)}
+            onClick={() => selectedRemote && (emit('fetch_changed_files', { remote: selectedRemote }), onCommit(selectedRemote, isPush))}
             className="bg-blue-700 hover:bg-blue-500 text-white font-bold px-5 py-2 rounded-xl transition shadow"
             disabled={!stagedFiles.length || !commitMsg.trim()}
           >
