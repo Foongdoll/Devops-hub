@@ -30,15 +30,7 @@ export const useGitManager = () => {
   const { setPushCount, setPullCount, selectedRemote} = useRemoteContext();
   const { emit } = useGitSocket();
   useEffect(() => {
-     
-    const fetch_commit_count_response = (data: { count: number }) => {
-      setPushCount(data.count);
-    }
-
-    const fetch_pull_request_count_response = (data: { count: number }) => {
-      setPullCount(data.count);
-    }
-
+        
     const connect_git_response = (data: { success: boolean, message: string}) => {
       if (data.success) {
         showToast(data.message, 'success');
@@ -63,8 +55,7 @@ export const useGitManager = () => {
       }
       
     }
-    on('fetch_commit_count_response', fetch_commit_count_response)
-    on('fetch_pull_request_count_response', fetch_pull_request_count_response)
+    
     on('connect_git_response', connect_git_response);
     on('git_notify', git_notify)
     return () => {

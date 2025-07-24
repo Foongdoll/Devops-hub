@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { DiffEditor, Editor } from "@monaco-editor/react";
 import type { Remote } from "../../customhook/git/useRemote";
 import type { File } from "../../customhook/git/useChanges";
@@ -294,17 +294,13 @@ function TitleAndFiles({
             setSelectedConflictFiles([...conflictFiles]);
         }
     };
-    const filesToRemoveRef = useRef<File[]>([]);
 
     useEffect(() => {
         if (socketResponse) {
-            // 1. 삭제 대상 저장
-            filesToRemoveRef.current = [...selectedConflictFiles];
-
-            if (setConflictFiles && filesToRemoveRef.current.length > 0) {
-                setConflictFiles(prev =>
+            if (setConflictFiles && selectedConflictFiles) {
+                setConflictFiles((prev: File[]) =>
                     prev.filter(
-                        file => !filesToRemoveRef.current.some(sel => sel.path === file.path)
+                        file => !selectedConflictFiles.some(sel => sel.path === file.path)
                     )
                 );
             }
@@ -314,6 +310,7 @@ function TitleAndFiles({
             setSocketResponse(false); // 초기화
         }
     }, [socketResponse]);
+
 
 
     return (
@@ -409,7 +406,9 @@ function TitleAndFiles({
                             </button>
                             <button
                                 className="w-full px-2 py-2 rounded-lg border border-blue-500 bg-white text-blue-600 font-semibold hover:bg-blue-50 transition flex items-center justify-center gap-1 text-sm"
-                                onClick={() => onCheckoutConflictFilesCommit(selectedRemote || {} as Remote, selectedConflictFiles, isPush, selectedRemoteBranch)}
+                                onClick={() => {
+                                    onCheckoutConflictFilesCommit(selectedRemote || {} as Remote, selectedConflictFiles, isPush, selectedRemoteBranch);                                    
+                                }}
                             >
                                 <CheckSquare size={16} /> 커밋
                             </button>

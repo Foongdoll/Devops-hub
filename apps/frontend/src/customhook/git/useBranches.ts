@@ -9,10 +9,11 @@ export type Branch = { name: string; current?: boolean; fullname?: string };
 export type TrackingBranch = { local: string; remote: string; ahead?: number; behind?: number };
 
 export function useBranches() {
-  const { setLocalBranches, setRemoteBranches, setSelectedLocalBranch, setSelectedRemoteBranch, setConflictModalOpen, selectedRemote } = useRemoteContext();
+  const { setLocalBranches, setRemoteBranches, setSelectedLocalBranch, setSelectedRemoteBranch, setConflictModalOpen, selectedRemote, conflictModalOpen } = useRemoteContext();
   const { emit, on, off } = useGitSocket();
   const [conflictFiles, setConflictFiles] = useState<File[]>([]);
   const [conflictBranch, setConflictBranch] = useState<string>('');
+  
 
   const fetchBranches = useCallback(async (remote: Remote) => {
     const result = await fetchBranchesImpl(remote) as { local: Branch[], remote: Branch[], tracking: TrackingBranch[] };
@@ -70,7 +71,7 @@ export function useBranches() {
     return () => {
       off('checkout_local_branch_response');
     }
-  }, [selectedRemote]);
+  }, [conflictModalOpen]);
 
 
 

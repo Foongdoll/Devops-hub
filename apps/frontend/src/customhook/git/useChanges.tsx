@@ -24,7 +24,7 @@ export function useChanges(initialUnstaged: File[] = [], initialStaged: File[] =
   // 선택된 줄 번호 관리 (변경 사항에서)
   const [selectedLines, setSelectedLines] = useState<number[]>([]);
 
-  const { showConfirm } = useGlobalUI();
+  const [socketResponse, setSocketResponse] = useState<boolean>(false);
 
   // 파일 스테이징/언스테이징
   const stageFile = useCallback((file: File) => {
@@ -155,8 +155,10 @@ export function useChanges(initialUnstaged: File[] = [], initialStaged: File[] =
           showToast('커밋이 성공적으로 완료되었습니다.', 'success');
           setStagedFiles([]);
           setCommitMsg('');
+          setSocketResponse(true);
         } else {
           showToast('커밋이 실패하였습니다.', 'error');
+          setSocketResponse(false);
         }
       } catch (error : any) {
         showToast(error.message, 'error');
@@ -218,6 +220,7 @@ export function useChanges(initialUnstaged: File[] = [], initialStaged: File[] =
     // 체크 아웃 중 충돌난 파일들 커밋, 푸시
     onCheckoutRemoteBranch,
     // 체크 아웃 중 충돌난 파일들 버림
-    onCheckoutConflictFilesDiscard
+    onCheckoutConflictFilesDiscard,
+    socketResponse, setSocketResponse
   };
 }

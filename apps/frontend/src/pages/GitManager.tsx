@@ -105,14 +105,11 @@ const GitManager = () => {
           branch={git.conflictBranch}
           left={git.left}
           right={git.right}
-          onGoToCommit={() => {
-            git.setTab('changes')
-            setConflictModalOpen(false);
-          }}          
-          onGoToStash={() => {
-            git.setTab('stash')
-            setConflictModalOpen(false);
-          }}
+          onCheckoutConflictFilesCommit={git.onCheckoutRemoteBranch}
+          onCheckoutConflictFilesStash={git.onCheckoutConflictFilesStash}
+          onCheckoutConflictFilesDiscard={git.onCheckoutConflictFilesDiscard}
+          socketResponse={git.socketResponse}
+          setSocketResponse={git.setSocketResponse}
         />
       </main>
     </div>
