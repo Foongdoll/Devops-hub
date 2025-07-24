@@ -1,24 +1,25 @@
 import React, { useEffect, useState } from "react";
-import { DiffEditor } from "@monaco-editor/react";
+import { DiffEditor, Editor } from "@monaco-editor/react";
 import type { Remote } from "../../customhook/git/useRemote";
 import type { File } from "../../customhook/git/useChanges";
+import { showConfirm } from "../../utils/notifyStore";
 import { useRemoteContext } from "../../context/RemoteContext";
-import { FileIcon, Menu as MenuIcon, X as CloseIcon, CornerDownLeft, Layers, Trash2 } from "lucide-react";
-import { Tooltip } from "react-tooltip";
+import { FileIcon, Menu as MenuIcon, X as CloseIcon, CheckSquare, CheckCircle, Circle, X, Check, } from "lucide-react";
 import "react-tooltip/dist/react-tooltip.css";
 
 interface ConflictModalProps {
     open: boolean;
     onClose: () => void;
-    conflictFiles: string[];
+    conflictFiles: File[];
     onSelectConflictFile: (file: File, remote: Remote, conflictBranch: string, selectedLocalBranch: string) => void;
     selectedFile: File | null;
     setSelectedFile: (file: File | null) => void;
     branch: string;
     left: string;
     right: string;
-    onGoToCommit: (tab: string) => void;
-    onGoToStash: (tab: string) => void;    
+    onCheckoutConflictFilesCommit: (remote: Remote, conflictFiles: File[], isPush: boolean, remoteBranch: string) => void;
+    onCheckoutConflictFilesStash: (remote: Remote, conflictFiles: File[]) => void;
+    onCheckoutConflictFilesDiscard: (remote: Remote, conflictFiles: File[], selectedLocalBranch: string) => void;
 }
 
 export const ConflictModal: React.FC<ConflictModalProps> = ({
@@ -31,13 +32,15 @@ export const ConflictModal: React.FC<ConflictModalProps> = ({
     branch,
     left,
     right,
-    onGoToCommit,
-    onGoToStash,    
+    onCheckoutConflictFilesCommit,
+    onCheckoutConflictFilesStash,
+    onCheckoutConflictFilesDiscard
 }) => {
 
-    const { selectedRemote, selectedLocalBranch } = useRemoteContext();
+    const { selectedRemote, selectedLocalBranch, selectedRemoteBranch } = useRemoteContext();
     const [showSidebar, setShowSidebar] = useState(false);
-
+    const [isPush, setIsPush] = useState(false);
+    const [selectedConflictFiles, setSelectedConflictFiles] = useState<File[]>([]);
     useEffect(() => {
         setSelectedFile(null);
         setShowSidebar(false);
@@ -87,6 +90,14 @@ export const ConflictModal: React.FC<ConflictModalProps> = ({
                         branch={branch}
                         selectedLocalBranch={selectedLocalBranch}
                         setSelectedFile={setSelectedFile}
+                        selectedConflictFiles={selectedConflictFiles}
+                        setSelectedConflictFiles={setSelectedConflictFiles}
+                        onCheckoutConflictFilesCommit={onCheckoutConflictFilesCommit}
+                        onCheckoutConflictFilesStash={onCheckoutConflictFilesStash}
+                        onCheckoutConflictFilesDiscard={onCheckoutConflictFilesDiscard}
+                        isPush={isPush}
+                        setIsPush={setIsPush}
+                        selectedRemoteBranch={selectedRemoteBranch}
                     />
                 </div>
 
@@ -120,17 +131,33 @@ export const ConflictModal: React.FC<ConflictModalProps> = ({
                         </div>
                     </div>
 
-                    <div className="flex-1 min-h-0">
+                    <div className="flex-1 min-h-0 overflow-auto"> {/* <- 추가: flex-1 min-h-0 */}
                         {selectedFile && left && right ? (
                             <DiffEditor
+                                key={selectedFile.path}
                                 height="100%"
                                 language="html"
                                 loading="로딩 중..."
                                 original={left}
                                 modified={right}
                                 theme="vs-dark"
+                                keepCurrentModifiedModel={true}
+                                keepCurrentOriginalModel={true}
                                 options={{
                                     readOnly: false,
+                                    renderWhitespace: 'all',
+                                    scrollBeyondLastLine: false,
+                                    minimap: { enabled: false }
+                                }}
+                            />
+                        ) : selectedFile && left ? (
+                            <Editor
+                                height="100%"
+                                language="html"
+                                value={left}
+                                theme="vs-dark"
+                                options={{
+                                    readOnly: true,
                                     renderWhitespace: 'all',
                                     scrollBeyondLastLine: false,
                                     minimap: { enabled: false }
@@ -141,42 +168,6 @@ export const ConflictModal: React.FC<ConflictModalProps> = ({
                                 {selectedFile ? "변경 내역이 없습니다." : "왼쪽에서 파일을 선택하세요."}
                             </div>
                         )}
-
-                        {/* 모달 하단(버튼 영역, 세련된 + 툴팁) */}
-                        <div className="w-full flex flex-row gap-3 justify-end items-center mt-8 pr-4">
-                            <button
-                                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow transition"
-                                onClick={() => onGoToCommit('commit')}
-                                data-tooltip-id="commit-tip"
-                                data-tooltip-content="수정된 내용을 커밋(저장)할 수 있는 탭으로 이동합니다."
-                            >
-                                <CornerDownLeft size={18} /> 커밋 탭 이동
-                            </button>
-                            <button
-                                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-700 text-white font-semibold shadow transition"
-                                onClick={() => onGoToStash('stash')}
-                                data-tooltip-id="stash-tip"
-                                data-tooltip-content="수정 내역을 임시 저장(스태시)할 수 있는 탭으로 이동합니다."
-                            >
-                                <Layers size={18} /> 스태시 탭 이동
-                            </button>
-                            <button
-                                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-200 hover:bg-red-500 text-gray-900 hover:text-white font-semibold shadow transition"
-                                onClick={() => {
-                                    if (window.confirm("정말 변경사항을 모두 버리시겠습니까? 이 작업은 되돌릴 수 없습니다.")) {
-                                        onGoToCommit('changes');
-                                    }
-                                }}
-                                data-tooltip-id="discard-tip"
-                                data-tooltip-content="현재 작업 내역을 완전히 삭제합니다 (주의!)"
-                            >
-                                <Trash2 size={18} /> 변경사항 버리기
-                            </button>
-                            {/* 툴팁은 한 번만 렌더링해도 OK */}
-                            <Tooltip id="commit-tip" place="top" />
-                            <Tooltip id="stash-tip" place="top" />
-                            <Tooltip id="discard-tip" place="top" />
-                        </div>
                     </div>
                 </div>
 
@@ -208,6 +199,12 @@ export const ConflictModal: React.FC<ConflictModalProps> = ({
                                 selectedLocalBranch={selectedLocalBranch}
                                 setSelectedFile={setSelectedFile}
                                 onCloseSidebar={() => setShowSidebar(false)}
+                                onCheckoutConflictFilesCommit={onCheckoutConflictFilesCommit}
+                                onCheckoutConflictFilesStash={onCheckoutConflictFilesStash}
+                                onCheckoutConflictFilesDiscard={onCheckoutConflictFilesDiscard}
+                                isPush={isPush}
+                                setIsPush={setIsPush}
+                                selectedRemoteBranch={selectedRemoteBranch}
                             />
                         </div>
                         <div className="flex-1" onClick={() => setShowSidebar(false)} />
@@ -218,7 +215,25 @@ export const ConflictModal: React.FC<ConflictModalProps> = ({
     );
 };
 
-// 파일리스트/타이틀 따로 분리 (재사용)
+interface TitleAndFilesProps {
+    conflictFiles: File[];
+    selectedFile: File | null;
+    onSelectConflictFile: (file: File, remote: Remote, conflictBranch: string, selectedLocalBranch: string) => void;
+    selectedRemote: Remote | null;
+    branch: string;
+    selectedLocalBranch: string;
+    setSelectedFile: (file: File | null) => void;
+    onCloseSidebar?: () => void;
+    selectedConflictFiles?: File[];
+    setSelectedConflictFiles?: (files: File[]) => void;
+    onCheckoutConflictFilesCommit: (remote: Remote, conflictFiles: File[], isPush: boolean, remoteBranch: string) => void;
+    onCheckoutConflictFilesStash: (remote: Remote, conflictFiles: File[]) => void;
+    onCheckoutConflictFilesDiscard: (remote: Remote, conflictFiles: File[], selectedLocalBranch: string) => void;
+    isPush: boolean;
+    setIsPush: (isPush: boolean) => void;
+    selectedRemoteBranch: string
+}
+
 function TitleAndFiles({
     conflictFiles,
     selectedFile,
@@ -228,7 +243,39 @@ function TitleAndFiles({
     selectedLocalBranch,
     setSelectedFile,
     onCloseSidebar,
-}: any) {
+    selectedConflictFiles = [],
+    setSelectedConflictFiles,
+    onCheckoutConflictFilesCommit,
+    onCheckoutConflictFilesStash,
+    onCheckoutConflictFilesDiscard,
+    selectedRemoteBranch,
+    isPush,
+    setIsPush
+}: TitleAndFilesProps) {
+    // 체크/언체크
+    const handleCheckboxChange = (file: File, checked: boolean) => {
+        if (!setSelectedConflictFiles) return;
+        if (checked) {
+            setSelectedConflictFiles([...selectedConflictFiles, file]);
+        } else {
+            setSelectedConflictFiles(selectedConflictFiles.filter(f => f.path !== file.path));
+        }
+    };
+
+    // 전체 선택 여부
+    const allChecked = conflictFiles.length > 0 && conflictFiles.every(f => selectedConflictFiles.includes(f));
+    const someChecked = selectedConflictFiles.length > 0 && !allChecked;
+
+    // 전체 토글 핸들러
+    const handleToggleAll = () => {
+        if (!setSelectedConflictFiles) return;
+        if (allChecked) {
+            setSelectedConflictFiles([]);
+        } else {
+            setSelectedConflictFiles([...conflictFiles]);
+        }
+    };
+
     return (
         <>
             <div className="mb-3">
@@ -241,42 +288,107 @@ function TitleAndFiles({
             </div>
             <div className="flex-1 overflow-auto border rounded bg-gray-100 p-3">
                 {conflictFiles.length > 0 ? (
-                    <ul className="space-y-2">
-                        {conflictFiles.map((filePath: string, idx: number) => (
-                            <li
-                                key={filePath}
-                                className={`
-                                    cursor-pointer rounded flex items-center gap-2 px-2 py-1 font-mono border
-                                    ${selectedFile?.path === filePath
-                                        ? "bg-blue-900 text-blue-100 border-blue-400"
-                                        : "bg-white text-gray-800 border-gray-200 hover:bg-purple-50"}
-                                    transition
-                                `}
-                                style={{
-                                    fontWeight: selectedFile?.path === filePath ? 700 : 400,
-                                    maxWidth: 240,
-                                    whiteSpace: 'nowrap',
-                                    textOverflow: 'ellipsis',
-                                    overflow: 'hidden'
-                                }}
-                                title={filePath}
+                    <>
+                        <ul className="space-y-2 h-[70%]">
+                            <li className="flex items-center gap-2 mb-1">
+                                <button
+                                    className="focus:outline-none"
+                                    type="button"
+                                    aria-label={allChecked ? "전체 체크 해제" : "전체 체크"}
+                                    onClick={handleToggleAll}
+                                >
+                                    {allChecked
+                                        ? <CheckCircle className="text-blue-600" size={18} />
+                                        : <Circle className={someChecked ? "text-blue-400" : "text-gray-300"} size={18} />}
+                                </button>
+                                <span className="text-gray-500 text-xs select-none">
+                                    전체 체크 ({conflictFiles.length}개)
+                                </span>
+                            </li>
+                            {conflictFiles.map((file: File, idx: number) => {
+                                const checked = selectedConflictFiles.includes(file);
+                                return (
+                                    <li
+                                        key={file.path}
+                                        className={`
+                                        cursor-pointer rounded flex items-center gap-2 px-2 py-1 font-mono border
+                                        ${selectedFile?.path === file.path
+                                                ? "bg-blue-900 text-blue-100 border-blue-400"
+                                                : "bg-white text-gray-800 border-gray-200 hover:bg-purple-50"}
+                                        transition
+                                    `}
+                                        style={{
+                                            fontWeight: selectedFile?.path === file.path ? 700 : 400,
+                                            maxWidth: 240,
+                                            whiteSpace: 'nowrap',
+                                            textOverflow: 'ellipsis',
+                                            overflow: 'hidden'
+                                        }}
+                                        title={file.path}
+                                        onClick={() => {
+                                            onSelectConflictFile(file, selectedRemote || {} as Remote, branch, selectedLocalBranch);
+                                            setSelectedFile?.(file);
+                                            if (onCloseSidebar) onCloseSidebar();
+                                        }}
+                                    >
+                                        {/* 아이콘 체크박스 */}
+                                        {setSelectedConflictFiles && (
+                                            <button
+                                                type="button"
+                                                onClick={e => {
+                                                    e.stopPropagation();
+                                                    handleCheckboxChange(file, !checked);
+                                                }}
+                                                aria-label={checked ? "선택 해제" : "선택"}
+                                                className="focus:outline-none"
+                                            >
+                                                {checked
+                                                    ? <CheckCircle className="text-blue-600" size={18} />
+                                                    : <Circle className="text-gray-300" size={18} />}
+                                            </button>
+                                        )}
+                                        <FileIcon size={17} className="text-indigo-400 flex-shrink-0" />
+                                        <span className="truncate">{file.name}</span>
+                                    </li>
+                                );
+                            })}
+                        </ul>
+                        {/* ↓↓↓ 해결 방법 버튼들 ↓↓↓ */}
+                        <div className="mt-5 flex flex-col gap-2 h-[15%]">
+
+                            <button
+                                className={`w-full px-2 py-2 rounded-lg border 
+                                    border-blue-500 font-semibold
+                                     flex items-center justify-center gap-1 text-sm
+                                     ${isPush ? 'bg-blue-600 text-white hover:bg-white-50 transition' : 'bg-white text-blue-600 hover:bg-blue-50 transition'} `}
                                 onClick={() => {
-                                    const fakeFile: File = {
-                                        status: "",
-                                        path: filePath,
-                                        name: filePath.split('/').pop() || filePath,
-                                        staged: false,
-                                    };
-                                    onSelectConflictFile(fakeFile, selectedRemote || {} as Remote, branch, selectedLocalBranch);
-                                    setSelectedFile?.(fakeFile);
-                                    if (onCloseSidebar) onCloseSidebar();
+                                    setIsPush(!isPush)
                                 }}
                             >
-                                <FileIcon size={17} className="text-indigo-400 flex-shrink-0" />
-                                <span className="truncate">{idx + 1}. {filePath}</span>
-                            </li>
-                        ))}
-                    </ul>
+                                <Check size={16} /> 커밋 후 바로 푸시
+                            </button>
+                            <button
+                                className="w-full px-2 py-2 rounded-lg border border-blue-500 bg-white text-blue-600 font-semibold hover:bg-blue-50 transition flex items-center justify-center gap-1 text-sm"
+                                onClick={() => onCheckoutConflictFilesCommit(selectedRemote || {} as Remote, selectedConflictFiles, isPush, selectedRemoteBranch)}
+                            >
+                                <CheckSquare size={16} /> 커밋
+                            </button>
+                            <button
+                                className="w-full px-2 py-2 rounded-lg border border-violet-500 bg-white text-violet-600 font-semibold hover:bg-violet-50 transition flex items-center justify-center gap-1 text-sm"
+                                onClick={() => onCheckoutConflictFilesStash(selectedRemote || {} as Remote, selectedConflictFiles)}
+                            >
+                                <Circle size={16} /> 스태시
+                            </button>
+                            <button
+                                className="w-full px-2 py-2 rounded-lg border border-gray-400 bg-white text-gray-500 font-semibold hover:bg-red-50 hover:text-red-500 transition flex items-center justify-center gap-1 text-sm"
+                                onClick={async () => {
+                                    // showConfirm & 버리기 핸들러 연결
+                                }}
+                            >
+                                <X size={16} /> 변경사항 버리기
+                            </button>
+                        </div>
+                    </>
                 ) : (
                     <div className="text-center text-gray-400 py-8">충돌 파일이 없습니다.</div>
                 )}
