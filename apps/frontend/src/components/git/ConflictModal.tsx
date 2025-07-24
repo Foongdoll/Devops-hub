@@ -292,13 +292,14 @@ function TitleAndFiles({
         }
     };
 
-    useEffect(() => {
-        alert(socketResponse);
+    useEffect(() => {        
         if (socketResponse) {
             if (setConflictFiles && selectedConflictFiles) {
                 setConflictFiles((prev: File[]) =>
                     prev.filter(
-                        file => !selectedConflictFiles.some(sel => sel.path === file.path)
+                        file => {
+                            console.log('file:', file);
+                            return !selectedConflictFiles.some(sel => sel.path === file.path)}
                     )
                 );
             }
