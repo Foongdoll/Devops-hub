@@ -6,6 +6,7 @@ import { TopStageBar } from "./GitBranchBar";
 import type { Remote } from "../../customhook/git/useRemote";
 import type { Branch } from "../../customhook/git/useBranches";
 import { useGitSocket } from "../../context/GitSocketContext";
+import { hideLoading } from "../../utils/notifyStore";
 
 // props 타입 정의
 export interface CommitHistoryPanelProps {
@@ -118,6 +119,7 @@ export const CommitHistoryPanel: React.FC<CommitHistoryPanelProps> = ({
 
     const handler = (commits: Map<string, Commit[]>) => {
       setCommits(commits);
+      hideLoading();
     };
 
     on("fetch_commit_history_response", handler);
