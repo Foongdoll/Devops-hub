@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { DiffEditor, Editor } from "@monaco-editor/react";
 import type { Remote } from "../../customhook/git/useRemote";
 import type { File } from "../../customhook/git/useChanges";
@@ -48,6 +48,9 @@ export const ConflictModal: React.FC<ConflictModalProps> = ({
     useEffect(() => {
         setSelectedFile(null);
         setShowSidebar(false);
+        setIsPush(false);
+        setSelectedConflictFiles([]);
+        setSocketResponse(false);
     }, [open]);
 
     if (!open) return null;
@@ -291,15 +294,17 @@ function TitleAndFiles({
             setSelectedConflictFiles([...conflictFiles]);
         }
     };
+    const filesToRemoveRef = useRef<File[]>([]);
 
-    useEffect(() => {        
+    useEffect(() => {
         if (socketResponse) {
-            if (setConflictFiles && selectedConflictFiles) {
-                setConflictFiles((prev: File[]) =>
+            // 1. 삭제 대상 저장
+            filesToRemoveRef.current = [...selectedConflictFiles];
+
+            if (setConflictFiles && filesToRemoveRef.current.length > 0) {
+                setConflictFiles(prev =>
                     prev.filter(
-                        file => {
-                            console.log('file:', file);
-                            return !selectedConflictFiles.some(sel => sel.path === file.path)}
+                        file => !filesToRemoveRef.current.some(sel => sel.path === file.path)
                     )
                 );
             }
@@ -309,7 +314,6 @@ function TitleAndFiles({
             setSocketResponse(false); // 초기화
         }
     }, [socketResponse]);
-
 
 
     return (
