@@ -64,7 +64,7 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
     }
   }
 
-
+  // 같은 리모트 사용중인 회원에게 메시지 전송
   private notifyAll(remote: Remote, message: string, type: 'pull' | 'push' | 'commit') {
     const sockets = this.gitClients.get(remote.id) || [];
     sockets.forEach(socket => {
@@ -210,16 +210,19 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
   @ApiOperation({ summary: 'Git 변경 파일 조회', description: '사용자가 Git 변경 파일을 조회합니다.' })
   @SubscribeMessage('fetch_changed_files')
   async handleFetchChangedFiles(
-    @MessageBody() remote: Remote,
+    @MessageBody() data: { remote: Remote },
     @ConnectedSocket() socket: Socket
   ) {
     try {
+      const { remote } = data;
+
       // Git 명령어 실행
       const { stdout, stderr } = await execFileAsync("git", [
         "-C", remote.path,
         "status",
         "-s"
       ]);
+
 
       // 변경된 파일 목록 파싱
       const changedFiles = stdout.split('\n')
@@ -239,7 +242,7 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
       // console.log(changedFiles);
       socket.emit('fetch_changed_files_response', changedFiles);
     } catch (error) {
-      this.logger.error(`Git diff command failed: ${error.message}`);
+      this.logger.error(`Git diff command failed: 244line: ${error.message}`);
       socket.emit('fetch_changed_files_response', []);
     }
   }
@@ -711,4 +714,28 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
     }
   }
 
+  @SubscribeMessage('fetch_change_count')
+  async handleFetchChangeCount(
+    @MessageBody() data: { remote: Remote },
+    @ConnectedSocket() socket: Socket
+  ) {
+    try {
+      const { remote } = data;
+      const { stdout } = await execFileAsync("git", [
+        "-C", remote.path, // 또는 remote.path
+        "status",
+        "--porcelain"
+      ]);
+
+      const changedFiles = stdout
+        .split('\n')         // 줄 단위로 분리
+        .filter(line => line.trim() !== ''); // 빈 줄 제외
+      const count = changedFiles.length;
+
+      socket.emit('fetch_change_count_response', { count });
+    } catch (error) {
+      this.logger.error(`Git status command failed: ${error.message}`);
+      socket.emit('fetch_change_count_response', { count: 0, message: error.message });
+    }
+  }
 }
