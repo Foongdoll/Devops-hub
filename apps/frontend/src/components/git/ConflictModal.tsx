@@ -21,6 +21,7 @@ interface ConflictModalProps {
     onCheckoutConflictFilesStash: (remote: Remote, conflictFiles: File[]) => void;
     onCheckoutConflictFilesDiscard: (remote: Remote, conflictFiles: File[], selectedLocalBranch: string) => void;
     socketResponse: boolean;
+    setSocketResponse: (response: boolean) => void;
 }
 
 export const ConflictModal: React.FC<ConflictModalProps> = ({
@@ -36,7 +37,8 @@ export const ConflictModal: React.FC<ConflictModalProps> = ({
     onCheckoutConflictFilesCommit,
     onCheckoutConflictFilesStash,
     onCheckoutConflictFilesDiscard,
-    socketResponse
+    socketResponse,
+    setSocketResponse
 }) => {
 
     const { selectedRemote, selectedLocalBranch, selectedRemoteBranch } = useRemoteContext();
@@ -86,6 +88,7 @@ export const ConflictModal: React.FC<ConflictModalProps> = ({
                 >
                     <TitleAndFiles
                         conflictFiles={conflictFiles}
+                        setConflictFiles={setSelectedConflictFiles}
                         selectedFile={selectedFile}
                         onSelectConflictFile={onSelectConflictFile}
                         selectedRemote={selectedRemote}
@@ -101,6 +104,7 @@ export const ConflictModal: React.FC<ConflictModalProps> = ({
                         setIsPush={setIsPush}
                         selectedRemoteBranch={selectedRemoteBranch}
                         socketResponse={socketResponse}
+                        setSocketResponse={setSocketResponse}
                     />
                 </div>
 
@@ -195,6 +199,7 @@ export const ConflictModal: React.FC<ConflictModalProps> = ({
                             </div>
                             <TitleAndFiles
                                 conflictFiles={conflictFiles}
+                                setConflictFiles={setSelectedConflictFiles}
                                 selectedFile={selectedFile}
                                 onSelectConflictFile={onSelectConflictFile}
                                 selectedRemote={selectedRemote}
@@ -209,6 +214,7 @@ export const ConflictModal: React.FC<ConflictModalProps> = ({
                                 setIsPush={setIsPush}
                                 selectedRemoteBranch={selectedRemoteBranch}
                                 socketResponse={socketResponse}
+                                setSocketResponse={setSocketResponse}
                             />
                         </div>
                         <div className="flex-1" onClick={() => setShowSidebar(false)} />
@@ -221,6 +227,7 @@ export const ConflictModal: React.FC<ConflictModalProps> = ({
 
 interface TitleAndFilesProps {
     conflictFiles: File[];
+    setConflictFiles: React.Dispatch<React.SetStateAction<File[]>>;
     selectedFile: File | null;
     onSelectConflictFile: (file: File, remote: Remote, conflictBranch: string, selectedLocalBranch: string) => void;
     selectedRemote: Remote | null;
@@ -237,10 +244,12 @@ interface TitleAndFilesProps {
     setIsPush: (isPush: boolean) => void;
     selectedRemoteBranch: string
     socketResponse: boolean;
+    setSocketResponse: (response: boolean) => void;
 }
 
 function TitleAndFiles({
     conflictFiles,
+    setConflictFiles,
     selectedFile,
     onSelectConflictFile,
     selectedRemote,
@@ -256,7 +265,8 @@ function TitleAndFiles({
     selectedRemoteBranch,
     isPush,
     setIsPush,
-    socketResponse
+    socketResponse,
+    setSocketResponse
 }: TitleAndFilesProps) {
     // 체크/언체크
     const handleCheckboxChange = (file: File, checked: boolean) => {
@@ -283,15 +293,23 @@ function TitleAndFiles({
     };
 
     useEffect(() => {
+        alert(socketResponse);
         if (socketResponse) {
-            if (setSelectedConflictFiles) {
-                setSelectedConflictFiles([]);
+            if (setConflictFiles && selectedConflictFiles) {
+                setConflictFiles((prev: File[]) =>
+                    prev.filter(
+                        file => !selectedConflictFiles.some(sel => sel.path === file.path)
+                    )
+                );
             }
+            if (setSelectedConflictFiles) setSelectedConflictFiles([]);
             setSelectedFile(null);
             if (onCloseSidebar) onCloseSidebar();
+            setSocketResponse(false); // 초기화
         }
-
     }, [socketResponse]);
+
+
 
     return (
         <>
