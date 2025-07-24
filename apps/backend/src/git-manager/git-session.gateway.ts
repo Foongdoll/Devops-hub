@@ -113,7 +113,7 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
     @ConnectedSocket() socket: Socket
   ) {
     try {
-      console.log(remoteBranch);
+
       // Git 명령어 실행
       const { stdout, stderr } = await execFileAsync("git", [
         "-C", remote.path,
@@ -356,6 +356,14 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
     @ConnectedSocket() socket: Socket
   ) {
     try {
+
+      console.log(files);
+      console.log(message);
+      console.log(remoteBranch);
+      console.log(isPush)
+      console.log(remote);
+
+
       if (!files.length || !message.trim()) {
         socket.emit('git_commit_response', { success: false, message: 'No files to commit or empty commit message' });
         return;
@@ -374,10 +382,11 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
 
       // 푸쉬
       if (isPush) {
-        const { stdout: pushStdout, stderr: pushStderr } = await execFileAsync("git", [
+        const { stdout: pushStdout, stderr } = await execFileAsync("git", [
           "-C", remote.path,
           "push",
-          remoteBranch
+          remote.name,
+          remoteBranch.split('/')[1],
         ]);
         this.logger.log(`Git push successful: ${pushStdout}`);
       }
