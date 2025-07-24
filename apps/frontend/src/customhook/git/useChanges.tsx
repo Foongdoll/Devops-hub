@@ -4,7 +4,6 @@ import { useRemoteContext } from '../../context/RemoteContext';
 import type { Remote } from './useRemote';
 import { hideLoading, showLoading, showToast } from '../../utils/notifyStore';
 import { delay } from '../../utils/comm';
-import { useGlobalUI } from '../../context/GlobalUIContext';
 export type File = { status: string; path: string; name: string; staged: boolean };
 
 export function useChanges(initialUnstaged: File[] = [], initialStaged: File[] = []) {
@@ -70,7 +69,7 @@ export function useChanges(initialUnstaged: File[] = [], initialStaged: File[] =
     setStagedFiles([]);
     setUnstagedFiles([]);
     setFileDiff('');
-    emit('fetch_changed_files', remote);
+    emit('fetch_changed_files', {remote: remote});
   }
 
   // 선택
@@ -128,8 +127,7 @@ export function useChanges(initialUnstaged: File[] = [], initialStaged: File[] =
           if (isStaged) staged.push(file);
           else unstaged.push(file);
         });
-
-        console.log(data);
+        
         setStagedFiles(staged);
         setUnstagedFiles(unstaged);
         setFileDiff('');
@@ -163,8 +161,9 @@ export function useChanges(initialUnstaged: File[] = [], initialStaged: File[] =
       } catch (error : any) {
         showToast(error.message, 'error');
       } finally {
-        emit('fetch_pull_request_count', { remote: response.remote, remoteBranch: response.remoteBranch });
+        emit('fetch_changed_files', { remote: response.remote });
         emit('fetch_commit_count', { remote: response.remote, remoteBranch: response.remoteBranch });
+        emit('fetch_pull_request_count', { remote: response.remote, remoteBranch: response.remoteBranch });
       }
     });
 

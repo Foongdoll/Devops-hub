@@ -2,29 +2,36 @@ import { ArrowUpFromLine, ArrowDownFromLine, RefreshCcw, Archive } from 'lucide-
 import type React from 'react';
 import { useRemoteContext } from '../../context/RemoteContext';
 import type { Remote } from '../../customhook/git/useRemote';
-import { useEffect } from 'react';
-import { useGitSocket } from '../../context/GitSocketContext';
+import { useGlobalUI } from '../../context/GlobalUIContext';
+import type { tabType } from '../../customhook/useGitManager';
+import type { Dispatch, SetStateAction } from 'react';
+import { delay } from '../../utils/comm';
 
 export type TopActionBarProps = {
   onPush: (remote: Remote | null, remoteBranch: string) => void;
   onPull: (remote: Remote | null, remoteBranch: string) => void;
   onFetch: () => void;
   onStash: () => void;
+  setTab: Dispatch<SetStateAction<tabType>>;
 };
 
 const badgeStyle =
   "absolute -top-1 -right-1 bg-red-600 text-xs text-white rounded-full px-1.5 py-0.5 font-bold shadow pointer-events-none";
 
 const TopActionBar: React.FC<TopActionBarProps> = ({
-  onPush, onPull, onFetch, onStash
+  onPush, onPull, onFetch, onStash, setTab
 }) => {
-  const { pushCount, pullCount, selectedRemoteBranch, selectedRemote } = useRemoteContext();
- 
+  const { pushCount, pullCount, selectedRemoteBranch, selectedRemote, setSelectedRemote } = useRemoteContext();
+  const { showToast } = useGlobalUI();
+
   return (
     <div className="flex items-center gap-2">
       <div className="relative">
         <button
-          onClick={() => onPush(selectedRemote || null, selectedRemoteBranch)}
+          onClick={async () => {
+            pushCount === 0 && showToast('푸시 할 변경 사항이 없습니다.', 'info');
+            selectedRemote ? onPush(selectedRemote, selectedRemoteBranch) : (showToast('선택된 리모트 정보가 없습니다.\n리모트 선택창으로 이동합니다.', 'info'), setSelectedRemote(null), await delay(1000), setTab("remotes"));
+          }}
           className="p-2 rounded-full hover:bg-blue-900 transition-colors group"
           title="Push"
         >
@@ -36,7 +43,10 @@ const TopActionBar: React.FC<TopActionBarProps> = ({
       </div>
       <div className="relative">
         <button
-          onClick={() => onPull(selectedRemote || null, selectedRemoteBranch)}
+          onClick={async () => {
+            // pullCount === 0 && showToast('풀 받을 변경 사항이 없습니다.', 'info');
+            selectedRemote ? onPull(selectedRemote, selectedRemoteBranch) : (showToast('선택된 리모트 정보가 없습니다.\n리모트 선택창으로 이동합니다.', 'info'), setSelectedRemote(null), await delay(1000),setTab("remotes"));
+          }}
           className="p-2 rounded-full hover:bg-blue-900 transition-colors group"
           title="Pull"
         >

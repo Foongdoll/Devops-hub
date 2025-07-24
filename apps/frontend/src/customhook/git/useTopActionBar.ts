@@ -1,20 +1,20 @@
 import { useCallback, useEffect } from 'react';
 import type { Remote } from './useRemote';
 import { useGitSocket } from '../../context/GitSocketContext';
-import { showToast } from '../../utils/notifyStore';
+import { hideLoading, showLoading, showToast } from '../../utils/notifyStore';
 import { useRemoteContext } from '../../context/RemoteContext';
 
 export function useTopActionBar() {
   const { emit, on, off } = useGitSocket();
-  const { selectedRemote } = useRemoteContext();
+  const { selectedRemote, remoteBranches } = useRemoteContext();
 
   const push = useCallback((remote: Remote | null, remoteBranch: string) => {
+    showLoading({ message: 'Pushing changes...' });
     emit('git_push', { remote, remoteBranch });
-    emit('fetch_pull_request_count', { remote: remote, remoteBranch: remoteBranch });
-    emit('fetch_commit_count', { remote: remote, remoteBranch: remoteBranch });
   }, [selectedRemote]);
 
   const pull = useCallback((remote: Remote | null, remoteBranch: string) => {
+    showLoading({ message: 'Pulling changes...' });
     emit('git_pull', { remote, remoteBranch });
   }, [selectedRemote]);
 
@@ -33,9 +33,9 @@ export function useTopActionBar() {
       } else {
         showToast('Push failed: ' + response.message, 'error');
       }
-
-      emit('fetch_pull_request_count', { remote: response.remote, remoteBranch: response.remoteBranch });
+      hideLoading();
       emit('fetch_commit_count', { remote: response.remote, remoteBranch: response.remoteBranch });
+      // emit && fetchCounts(emit, response.remote, response.remoteBranch);    
     }
 
     const git_pull_response = (response: {
@@ -49,8 +49,8 @@ export function useTopActionBar() {
       } else {
         showToast('Pull failed: ' + response.message, 'error');
       }
+      hideLoading();
       emit('fetch_pull_request_count', { remote: response.remote, remoteBranch: response.remoteBranch });
-      emit('fetch_commit_count', { remote: response.remote, remoteBranch: response.remoteBranch });
     }
 
     on('git_push_response', git_push_response);

@@ -23,9 +23,10 @@ export function useBranches() {
     setRemoteBranches(result.remote);
     setSelectedLocalBranch(result.local.find(b => b.current)?.name || '');
     setSelectedRemoteBranch(result.remote.find(b => b.current)?.name || '');
-    emit('connect_git', { remote: remote })
-    emit('fetch_pull_request_count', { remote: remote, remoteBranch: result.remote.find(b => b.current)?.name || '' });
+    emit('connect_git', { remote: remote })        
+    emit('fetch_changed_files', { remote: remote });
     emit('fetch_commit_count', { remote: remote, remoteBranch: result.remote.find(b => b.current)?.name || '' });
+    emit('fetch_pull_request_count', { remote: remote, remoteBranch: result.remote.find(b => b.current)?.name || '' });
     return true;
   }, [selectedRemote]);
 

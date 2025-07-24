@@ -2,7 +2,6 @@ import { useState, useCallback, useEffect, useMemo } from "react";
 import { useGitSocket } from "../../context/GitSocketContext";
 import { useRemoteContext } from "../../context/RemoteContext";
 import type { Remote } from "./useRemote";
-import { fetchCounts } from "../useGitManager";
 import type { Branch } from "./useBranches";
 import { showLoading } from "../../utils/notifyStore";
 
