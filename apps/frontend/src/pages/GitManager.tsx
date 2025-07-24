@@ -8,10 +8,10 @@ import { CommitHistoryPanel } from "../components/git/CommitHistoryPanel";
 import { ConflictModal } from "../components/git/ConflictModal";
 import { useRemoteContext } from "../context/RemoteContext";
 
+
 const GitManager = () => {
   const git = useGitManager(); // 커스텀 훅에서 전부 가져오기
   const { conflictModalOpen, setConflictModalOpen, } = useRemoteContext();
-
 
   return (
     <div className="flex flex-col w-full h-full bg-gray-950 text-gray-100">
@@ -21,6 +21,7 @@ const GitManager = () => {
           onPull={git.pull}
           onFetch={git.fetch}
           onStash={git.stash}
+          setTab={git.setTab}
         />
       </TabNav>
 

@@ -3,6 +3,7 @@ import { Pencil, Trash2, Plus, FolderOpen } from 'lucide-react';
 import { showToast } from '../../utils/notifyStore';
 import type { Remote } from '../../customhook/git/useRemote';
 import type { tabType } from '../../customhook/useGitManager';
+import { useRemoteContext } from '../../context/RemoteContext';
 
 export interface RemotesPanelProps {
   remotes: Remote[];
@@ -19,7 +20,7 @@ const RemotesPanel: React.FC<RemotesPanelProps> = ({ remotes, onAdd, onEdit, onR
   const [showForm, setShowForm] = useState(false);
   const [editRemote, setEditRemote] = useState<Remote | null>(null);
   const [form, setForm] = useState<Remote>({ id: '', name: '', url: '', path: '' });
-
+  
   // 폴더 선택 다이얼로그 (웹 환경에선 input[file webkitdirectory], 데스크탑/Electron에선 dialog 연동)
   const handleBrowseFolder = async () => {
     // 웹은 브라우저 제한이 많으므로 아래는 샘플(실제 Electron에선 dialog 호출)
@@ -41,8 +42,7 @@ const RemotesPanel: React.FC<RemotesPanelProps> = ({ remotes, onAdd, onEdit, onR
     setEditRemote(null);
     setForm({ id: '', name: '', url: '', path: '' });
   };
-
-
+  
   return (
     <section className="max-w-xl mx-auto py-6">
       <header className="flex justify-between items-center mb-4">

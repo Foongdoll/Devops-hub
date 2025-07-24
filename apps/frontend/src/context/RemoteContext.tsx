@@ -22,6 +22,8 @@ interface RemoteContextType {
   setPullCount: (count: number) => void;
   conflictModalOpen: boolean;
   setConflictModalOpen: (open: boolean) => void;
+  changesCount: number;
+  setChangesCount: (count: number) => void;
 }
 
 const RemoteContext = createContext<RemoteContextType | undefined>(undefined);
@@ -48,6 +50,7 @@ export const RemoteProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const [pushCount, setPushCount] = useState(0);
   const [pullCount, setPullCount] = useState(0);
+  const [changesCount, setChangesCount] = useState(0);
 
   const [conflictModalOpen, setConflictModalOpen] = useState(false);
   
@@ -63,6 +66,7 @@ export const RemoteProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setSelectedRemoteBranch("");
       setPushCount(0);
       setPullCount(0);
+      setChangesCount(0);
     }
   }, [selectedRemote])
 
@@ -86,7 +90,9 @@ export const RemoteProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       pullCount,
       setPullCount,
       conflictModalOpen,
-      setConflictModalOpen
+      setConflictModalOpen,
+      changesCount, 
+      setChangesCount
     }}>
       {children}
     </RemoteContext.Provider>

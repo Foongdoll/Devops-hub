@@ -100,7 +100,7 @@ export const CommitHistoryPanel: React.FC<CommitHistoryPanelProps> = ({
   onSelectRemoteBranch
 }) => {
   const { localBranches, remoteBranches, selectedRemote, selectedLocalBranch, selectedRemoteBranch } = useRemoteContext();
-  const { on, off } = useGitSocket();
+  const { on, off, emit } = useGitSocket();
 
   // 브랜치별 오픈 상태
   const [openBranches, setOpenBranches] = React.useState<{ [branch: string]: boolean }>({});
@@ -114,28 +114,11 @@ export const CommitHistoryPanel: React.FC<CommitHistoryPanelProps> = ({
   };
 
 
-  const { setPushCount, setPullCount } = useRemoteContext();  
-  useEffect(() => {
-    const fetch_commit_count_response = (data: { count: number }) => {
-      setPushCount(data.count);
-    }
-
-    const fetch_pull_request_count_response = (data: { count: number }) => {
-      setPullCount(data.count);
-    }
-    on('fetch_commit_count_response', fetch_commit_count_response)
-    on('fetch_pull_request_count_response', fetch_pull_request_count_response)
-    return () => {
-      off('fetch_commit_count_response');
-      off('fetch_pull_request_count_response');
-    }
-  }, [])
-  
   React.useEffect(() => {
     if (!selectedRemote || !remoteBranches) return;
     fetchCommitHistory(selectedRemote, remoteBranches);
-
-    const handler = (commits: Map<string, Commit[]>) => {
+        
+    const handler = (commits: Map<string, Commit[]>) => {      
       setCommits(commits);
       hideLoading();
     };

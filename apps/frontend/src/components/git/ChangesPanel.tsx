@@ -5,7 +5,6 @@ import { useRemoteContext } from '../../context/RemoteContext';
 import type { Remote } from '../../customhook/git/useRemote';
 import { TopStageBar } from './GitBranchBar';
 import { Tooltip } from 'react-tooltip';
-import { useGitSocket } from '../../context/GitSocketContext';
 
 
 export interface ChangesPanelProps {
@@ -45,31 +44,12 @@ const ChangesPanel: React.FC<ChangesPanelProps> = ({
 }) => {
 
   const { selectedRemote, selectedLocalBranch, selectedRemoteBranch, localBranches, remoteBranches } = useRemoteContext();
-  const [isPush, setIsPush] = useState(false);
-
-  const { setPushCount, setPullCount } = useRemoteContext();
-  const { on, off } = useGitSocket();
-  useEffect(() => {
-    const fetch_commit_count_response = (data: { count: number }) => {
-      setPushCount(data.count);
-    }
-
-    const fetch_pull_request_count_response = (data: { count: number }) => {
-      setPullCount(data.count);
-    }
-    on('fetch_commit_count_response', fetch_commit_count_response)
-    on('fetch_pull_request_count_response', fetch_pull_request_count_response)
-    return () => {
-      off('fetch_commit_count_response');
-      off('fetch_pull_request_count_response');
-    }
-  }, [])
+  const [isPush, setIsPush] = useState(false);  
 
   useEffect(() => {
     // 초기 로드 시 변경 사항 가져오기    
     if (!selectedRemote) return;
     fetchChanges(selectedRemote);
-
   }, [selectedRemote]);
 
 
@@ -180,7 +160,7 @@ const ChangesPanel: React.FC<ChangesPanelProps> = ({
         <div className="bg-gray-900 rounded-lg shadow p-4 flex-1 overflow-y-auto">
           {selectedFile && diff ? (
 
-            <div className="font-mono text-sm text-gray-100">
+            <div className="font-mono text-sm text-gray-100 w-fit min-w-full">
               {(() => {
                 let oldLine = 0;
                 let newLine = 0;

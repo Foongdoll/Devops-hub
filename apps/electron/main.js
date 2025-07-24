@@ -20,7 +20,7 @@ function createWindow() {
   mainWindow.loadURL('http://localhost:5173');
 
   // 개발자 도구 자동 오픈 (선택)
-  mainWindow.webContents.openDevTools();
+  // mainWindow.webContents.openDevTools();
 
   // 커스텀 타이틀바 IPC (최소화/최대화/닫기)
   ipcMain.handle('window:minimize', () => mainWindow.minimize());

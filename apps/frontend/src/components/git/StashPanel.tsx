@@ -1,13 +1,11 @@
 import { Archive, FileText, Trash2 } from 'lucide-react';
-import type { FileItem } from './ChangesPanel';
-import { useEffect } from 'react';
-import { useRemoteContext } from '../../context/RemoteContext';
-import { useGitSocket } from '../../context/GitSocketContext';
+import type { File } from '../../customhook/git/useChanges';
+
 
 export interface Stash {
   name: string;
   message: string;
-  files: FileItem[];
+  files: File[];
 }
 
 export interface StashPanelProps {
@@ -16,31 +14,15 @@ export interface StashPanelProps {
   onDrop: (stash: Stash) => void;
   onSelect: (stash: Stash) => void;
   selectedStash: Stash | null;
-  files: FileItem[];
-  onFileSelect: (file: FileItem) => void;
-  selectedFile: FileItem | null;
+  files: File[];
+  onFileSelect: (file: File) => void;
+  selectedFile: File | null;
   diff: string;
 }
 
 
 const StashPanel: React.FC<StashPanelProps> = ({ stashes, onApply, onDrop, onSelect, selectedStash, files, onFileSelect, selectedFile, diff }) => {
-  const { setPushCount, setPullCount } = useRemoteContext();
-  const { on, off } = useGitSocket();
-  useEffect(() => {
-    const fetch_commit_count_response = (data: { count: number }) => {
-      setPushCount(data.count);
-    }
-
-    const fetch_pull_request_count_response = (data: { count: number }) => {
-      setPullCount(data.count);
-    }
-    on('fetch_commit_count_response', fetch_commit_count_response)
-    on('fetch_pull_request_count_response', fetch_pull_request_count_response)
-    return () => {
-      off('fetch_commit_count_response');
-      off('fetch_pull_request_count_response');
-    }
-  }, [])
+   
   return (
     <section className="flex flex-col md:flex-row h-[calc(100vh-220px)] gap-6 px-6 py-6">
       {/* Stash List */}

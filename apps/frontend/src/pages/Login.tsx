@@ -10,7 +10,7 @@ const Login = () => {
   } = useLogin({ navigate });
 
   return (
-    <div className="min-h-screen flex flex-col justify-center items-center bg-gradient-to-tr from-[#e8defa] to-[#b3c1f7]">
+    <div className="h-[calc(100vh-40px)] flex flex-col justify-center items-center bg-gradient-to-tr from-[#e8defa] to-[#b3c1f7]">
       <div className="w-[370px] bg-white rounded-2xl shadow-2xl p-10 flex flex-col items-center">
         {/* 로고 */}
         <div className="mb-4">

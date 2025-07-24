@@ -7,7 +7,7 @@ const Join = () => {
   const { userId, setUserId, userPw, setUserPw, userName, setUserName, handleJoin } = useJoin({ navigate });
 
   return (
-    <div className="min-h-screen flex flex-col justify-center items-center bg-gradient-to-tr from-[#e8defa] to-[#b3c1f7]">
+    <div className="h-[calc(100vh-40px)] flex flex-col justify-center items-center bg-gradient-to-tr from-[#e8defa] to-[#b3c1f7]">
       <div className="w-[370px] bg-white rounded-2xl shadow-2xl p-10 flex flex-col items-center">
         <div className="text-2xl font-bold text-[#6f52e4] mb-3">회원가입</div>
         <form className="w-full" onSubmit={handleJoin}>

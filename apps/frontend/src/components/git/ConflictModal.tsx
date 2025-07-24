@@ -2,10 +2,10 @@ import React, { useEffect, useState } from "react";
 import { DiffEditor, Editor } from "@monaco-editor/react";
 import type { Remote } from "../../customhook/git/useRemote";
 import type { File } from "../../customhook/git/useChanges";
-import { showConfirm } from "../../utils/notifyStore";
 import { useRemoteContext } from "../../context/RemoteContext";
 import { FileIcon, Menu as MenuIcon, X as CloseIcon, CheckSquare, CheckCircle, Circle, X, Check, } from "lucide-react";
 import "react-tooltip/dist/react-tooltip.css";
+
 
 interface ConflictModalProps {
     open: boolean;
@@ -41,11 +41,11 @@ export const ConflictModal: React.FC<ConflictModalProps> = ({
     setSocketResponse
 }) => {
 
-    const { selectedRemote, selectedLocalBranch, selectedRemoteBranch } = useRemoteContext();
+    const { selectedRemote, selectedLocalBranch, selectedRemoteBranch, } = useRemoteContext();
     const [showSidebar, setShowSidebar] = useState(false);
     const [isPush, setIsPush] = useState(false);
-    const [selectedConflictFiles, setSelectedConflictFiles] = useState<File[]>([]);
-    useEffect(() => {
+    const [selectedConflictFiles, setSelectedConflictFiles] = useState<File[]>([]);    
+    useEffect(() => {        
         setSelectedFile(null);
         setShowSidebar(false);
         setIsPush(false);
@@ -407,7 +407,7 @@ function TitleAndFiles({
                             <button
                                 className="w-full px-2 py-2 rounded-lg border border-blue-500 bg-white text-blue-600 font-semibold hover:bg-blue-50 transition flex items-center justify-center gap-1 text-sm"
                                 onClick={() => {
-                                    onCheckoutConflictFilesCommit(selectedRemote || {} as Remote, selectedConflictFiles, isPush, selectedRemoteBranch);                                    
+                                    onCheckoutConflictFilesCommit(selectedRemote || {} as Remote, selectedConflictFiles, isPush, selectedRemoteBranch);
                                 }}
                             >
                                 <CheckSquare size={16} /> 커밋
