@@ -10,11 +10,6 @@ import { useRemoteContext } from '../context/RemoteContext';
 import { showToast } from '../utils/notifyStore';
 
 export type tabType = 'history' | 'remotes' | 'changes' | 'branches' | 'stash';
-export const fetchCounts = (remote: Remote | null, remoteBranch: string) => {
-  const { emit } = useGitSocket();
-  emit('fetch_pull_request_count', { remote: remote, remoteBranch: remoteBranch });
-  emit('fetch_commit_count', { remote: remote, remoteBranch: remoteBranch });
-}
 
 
 export const useGitManager = () => {
@@ -27,11 +22,11 @@ export const useGitManager = () => {
 
   const [tab, setTab] = useState<tabType>('remotes');
   const { on, off } = useGitSocket();
-  const { setPushCount, setPullCount, selectedRemote} = useRemoteContext();
+  const { setPushCount, setPullCount, selectedRemote, selectedRemoteBranch, setChangesCount } = useRemoteContext();
   const { emit } = useGitSocket();
   useEffect(() => {
-        
-    const connect_git_response = (data: { success: boolean, message: string}) => {
+
+    const connect_git_response = (data: { success: boolean, message: string }) => {
       if (data.success) {
         showToast(data.message, 'success');
       } else {
@@ -41,11 +36,11 @@ export const useGitManager = () => {
 
     const git_notify = (data: { message: string, type: string, remote: Remote }) => {
       showToast(data.message, 'info');
-      
+
       switch (data.type) {
         case 'pull':
-          
-          break;        
+
+          break;
         case 'push':
           emit('fetch_pull_request_count', { remote: data.remote, remoteBranch: '' });
           break;
@@ -53,9 +48,9 @@ export const useGitManager = () => {
           emit('fetch_commit_count', { remote: data.remote, remoteBranch: '' });
           break;
       }
-      
+
     }
-    
+
     on('connect_git_response', connect_git_response);
     on('git_notify', git_notify)
     return () => {
@@ -64,6 +59,35 @@ export const useGitManager = () => {
       off('connect_git_response');
     }
   }, [selectedRemote])
+
+  useEffect(() => {
+    const fetch_commit_count_response = (data: { count: number }) => {
+      setPushCount(data.count);
+    }
+
+    const fetch_pull_request_count_response = (data: { count: number }) => {
+      setPullCount(data.count);
+    }
+    on('fetch_commit_count_response', fetch_commit_count_response)
+    on('fetch_pull_request_count_response', fetch_pull_request_count_response)
+
+    emit('fetch_pull_request_count', { remote: selectedRemote, remoteBranch: selectedRemoteBranch });
+    emit('fetch_commit_count', { remote: selectedRemote, remoteBranch: selectedRemoteBranch });
+    emit('fetch_change_count', { remote: selectedRemote });
+    on('fetch_change_count_response', (data: { count: number, message?: string }) => {
+      if (data.message) {
+        showToast(data.message, 'error');
+        return;
+      }
+      setChangesCount(data.count);
+    });
+
+    return () => {
+      off('fetch_change_count_response');
+      off('fetch_commit_count_response');
+      off('fetch_pull_request_count_response');
+    }
+  }, [tab])
 
   return {
     tab, setTab,

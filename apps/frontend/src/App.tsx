@@ -50,7 +50,6 @@ const App = () => (
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/join" element={<Join />} />
-
         {/* 이 라우트 하나로 대시보드 관련 모든 경로를 감쌉니다 */}
         <Route
           path="/*"
