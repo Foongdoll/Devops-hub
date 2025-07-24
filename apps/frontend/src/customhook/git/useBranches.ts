@@ -4,13 +4,14 @@ import { fetchBranchesImpl } from '../../services/GitManagerService';
 import { useRemoteContext } from '../../context/RemoteContext';
 import { useGitSocket } from '../../context/GitSocketContext';
 import { showToast } from '../../utils/notifyStore';
+import type { File } from './useChanges';
 export type Branch = { name: string; current?: boolean; fullname?: string };
 export type TrackingBranch = { local: string; remote: string; ahead?: number; behind?: number };
 
 export function useBranches() {
   const { setLocalBranches, setRemoteBranches, setSelectedLocalBranch, setSelectedRemoteBranch, setConflictModalOpen, selectedRemote } = useRemoteContext();
   const { emit, on, off } = useGitSocket();
-  const [conflictFiles, setConflictFiles] = useState<string[]>([]);
+  const [conflictFiles, setConflictFiles] = useState<File[]>([]);
   const [conflictBranch, setConflictBranch] = useState<string>('');
 
   const fetchBranches = useCallback(async (remote: Remote) => {
@@ -52,8 +53,7 @@ export function useBranches() {
 
 
   useEffect(() => {
-    on('checkout_local_branch_response', (data: { success: boolean; message: string, branch: string, conflictFiles: string[], remote? : Remote}) => {
-      console.log("checkout_local_branch_response", data);
+    on('checkout_local_branch_response', (data: { success: boolean; message: string, branch: string, conflictFiles: File[], remote? : Remote}) => {      
       if (data.success) {
         showToast('로컬 브랜치 변경 성공', 'success');
         setSelectedLocalBranch(data.branch);

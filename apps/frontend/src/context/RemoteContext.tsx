@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from "react";
+import React, { createContext, useContext, useEffect, useState } from "react";
 import type { Remote } from "../customhook/git/useRemote";
 import type { Branch } from "../customhook/git/useBranches";
 
@@ -51,6 +51,20 @@ export const RemoteProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const [conflictModalOpen, setConflictModalOpen] = useState(false);
   
+
+  useEffect(() => {
+    // 초기화 로직 (예: 리모트 목록 불러오기 등)
+    if (!selectedRemote) {
+      setSelectedRemote(null);
+      setLocalBranches([]);
+      setRemoteBranches([]);
+      setCommitBranches([]);
+      setSelectedLocalBranch("");
+      setSelectedRemoteBranch("");
+      setPushCount(0);
+      setPullCount(0);
+    }
+  }, [selectedRemote])
 
   return (
     <RemoteContext.Provider value={{

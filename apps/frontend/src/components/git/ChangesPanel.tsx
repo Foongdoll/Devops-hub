@@ -5,6 +5,7 @@ import { useRemoteContext } from '../../context/RemoteContext';
 import type { Remote } from '../../customhook/git/useRemote';
 import { TopStageBar } from './GitBranchBar';
 import { Tooltip } from 'react-tooltip';
+import { useGitSocket } from '../../context/GitSocketContext';
 
 
 export interface ChangesPanelProps {
@@ -46,6 +47,23 @@ const ChangesPanel: React.FC<ChangesPanelProps> = ({
   const { selectedRemote, selectedLocalBranch, selectedRemoteBranch, localBranches, remoteBranches } = useRemoteContext();
   const [isPush, setIsPush] = useState(false);
 
+  const { setPushCount, setPullCount } = useRemoteContext();
+  const { on, off } = useGitSocket();
+  useEffect(() => {
+    const fetch_commit_count_response = (data: { count: number }) => {
+      setPushCount(data.count);
+    }
+
+    const fetch_pull_request_count_response = (data: { count: number }) => {
+      setPullCount(data.count);
+    }
+    on('fetch_commit_count_response', fetch_commit_count_response)
+    on('fetch_pull_request_count_response', fetch_pull_request_count_response)
+    return () => {
+      off('fetch_commit_count_response');
+      off('fetch_pull_request_count_response');
+    }
+  }, [])
 
   useEffect(() => {
     // 초기 로드 시 변경 사항 가져오기    

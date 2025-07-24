@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import type { File } from './useChanges';
+import type { Remote } from './useRemote';
 export type Stash = { name: string; message: string; files: File[] };
 
 export function useStash(initial: Stash[] = []) {
@@ -7,7 +8,7 @@ export function useStash(initial: Stash[] = []) {
   const [selectedStash, setSelectedStash] = useState<Stash | null>(null);
   const [stashFiles, setStashFiles] = useState<File[]>([]);
   const [selectedStashFile, setSelectedStashFile] = useState<File | null>(null);
-  const [stashDiff, setStashDiff] = useState<string>('');
+  const [stashDiff, setStashDiff] = useState<string>('');  
 
   const applyStash = useCallback((stash: Stash) => {
     setStashes(prev => prev.filter(s => s.name !== stash.name));
@@ -26,9 +27,16 @@ export function useStash(initial: Stash[] = []) {
     setSelectedStashFile(file);
   }, []);
 
+  // 로컬 브랜치 체크아웃 중 충돌 난 파일 스테시 
+  const onCheckoutConflictFilesStash = useCallback((remote: Remote, conflictFiles: File[]) => {
+
+  }, []);
+
+
   return {
     stashes, selectedStash, stashFiles, selectedStashFile, stashDiff,
     applyStash, dropStash, selectStash, selectStashFile,
-    setStashes
+    setStashes,
+    onCheckoutConflictFilesStash
   };
 }
