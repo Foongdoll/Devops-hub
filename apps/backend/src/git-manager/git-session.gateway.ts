@@ -12,10 +12,12 @@ import { Server, Socket } from 'socket.io';
 import { Inject, Logger, UseGuards } from '@nestjs/common';
 import { promisify } from 'util';
 import { exec, execFile } from 'child_process';
+import { promises as fs } from 'fs';
 import { JwtTokenService } from 'src/auth/jwt.service';
 import { Branch, fetch_commit_history } from 'src/common/type/git.interface';
 import { Remote } from './entity/remote.entity';
 import { ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import path from 'path';
 const execFileAsync = promisify(execFile);
 
 @ApiBearerAuth()
@@ -59,11 +61,17 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
 
   handleDisconnect(socket: Socket) {
     for (const [remoteId, sockets] of this.gitClients.entries()) {
-      const filtered = sockets.filter(s => s.id !== socket.id);
-      this.gitClients.set(remoteId, filtered);
+      const index = sockets.findIndex(s => s.id === socket.id);
+      if (index !== -1) {
+        sockets.splice(index, 1);
+        this.logger.log(`Git 소켓 연결 해제됨: ${socket.id} from remote ${remoteId}`);
+        if (sockets.length === 0) {
+          this.gitClients.delete(remoteId);
+        }
+        break;
+      }
     }
   }
-
   // 같은 리모트 사용중인 회원에게 메시지 전송
   private notifyAll(remote: Remote, message: string, type: 'pull' | 'push' | 'commit') {
     const sockets = this.gitClients.get(remote.id) || [];
@@ -210,11 +218,12 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
   @ApiOperation({ summary: 'Git 변경 파일 조회', description: '사용자가 Git 변경 파일을 조회합니다.' })
   @SubscribeMessage('fetch_changed_files')
   async handleFetchChangedFiles(
-    @MessageBody() data: { remote: Remote },
+    @MessageBody() data: { remote: Remote, discard?: boolean },
     @ConnectedSocket() socket: Socket
   ) {
     try {
-      const { remote } = data;
+      console.log(data);
+      const { remote, discard } = data;
 
       // Git 명령어 실행
       const { stdout, stderr } = await execFileAsync("git", [
@@ -222,8 +231,7 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
         "status",
         "-s"
       ]);
-
-
+      this.logger.log(`Git status command executed: ${stdout}`);
       // 변경된 파일 목록 파싱
       const changedFiles = stdout.split('\n')
         .filter(line => line.trim() !== '')
@@ -240,7 +248,7 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
         });
 
       // console.log(changedFiles);
-      socket.emit('fetch_changed_files_response', changedFiles);
+      socket.emit('fetch_changed_files_response', { changedFiles, discard });
     } catch (error) {
       this.logger.error(`Git diff command failed: 244line: ${error.message}`);
       socket.emit('fetch_changed_files_response', []);
@@ -408,6 +416,10 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
     @ConnectedSocket() socket: Socket
   ) {
     try {
+      if (!remote) {
+        socket.emit('fetch_commit_count_response', { count: 0, message: 'No remote repository specified' });
+        return;
+      }
       var tempRemote = '';
       if (remoteBranch === '') {
         const { stdout } = await execFileAsync("git", [
@@ -467,6 +479,10 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
     @ConnectedSocket() socket: Socket
   ) {
     try {
+      if (!remote) {
+        socket.emit('fetch_pull_request_count_response', { count: 0, message: 'No remote repository specified' });
+        return;
+      }
       var tempRemote = '';
       if (remoteBranch === '') {
         const { stdout } = await execFileAsync("git", [
@@ -700,12 +716,48 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
 
       const { stdout: res } = await execFileAsync("git", ["-C", remote.path, "clean", "-fd"]);
       this.logger.log(`Discard All Changes 성공: ${stdout} ${res}`);
-      socket.emit('discard_all_success', { filePath });
+      socket.emit('discard_all_response', { success: true, filePath });
     } catch (error) {
       this.logger.error('Discard All Error', error);
-      socket.emit('discard_all_error', { filePath, error: error?.message ?? error });
+      socket.emit('discard_all_response', { success: false, filePath, error: error?.message ?? error });
     }
   }
+
+  @SubscribeMessage('discard_lines')
+  async handleDiscardLines(
+    @MessageBody() data: { remote: Remote; filePath: string; lines: number[] },
+    @ConnectedSocket() socket: Socket
+  ) {
+
+    const { remote, filePath, lines } = data;
+
+    try {
+      const fullPath = path.join(remote.path, filePath);
+      const fileContent = await fs.readFile(fullPath, 'utf-8');
+      const contentLines = fileContent.split('\n');
+
+      // 선택된 줄 제거 (line 번호는 1-based 기준으로 전달되었다고 가정)
+      const filteredLines = contentLines.filter((_, index) => !lines.includes(index + 1));
+
+      await fs.writeFile(fullPath, filteredLines.join('\n'), 'utf-8');
+
+      socket.emit('discard_lines_response', {
+        success: true,
+        message: `${filePath} 파일에서 ${lines.length}  `,
+        remote: remote,
+        filePath: filePath,
+        lines: lines,
+      });
+    } catch (error) {
+      console.error('discard_lines error:', error);
+      socket.emit('discard_lines_response', {
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+
+
 
   @SubscribeMessage('fetch_change_count')
   async handleFetchChangeCount(
@@ -747,11 +799,36 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
       await execFileAsync('git', args);
 
       // 응답 보내기 (선택)
-      socket.emit('discard_success', { files: filePaths });
+      socket.emit('discard_file_response', { success: true, message: '파일이 성공적으로 버려졌습니다.', files: files });
     } catch (error) {
       console.error('Discard error:', error);
-      socket.emit('discard_error', { error: error.message });
+      socket.emit('discard_file_response', { success: false, message: error.message, files: [] });
     }
   }
 
+
+  @SubscribeMessage('git_stash_push')
+  async handleStashPush(
+    @MessageBody() data: { remote: Remote; files: { status: string; path: string; name: string; staged: boolean }[]; newStash: { name: string; message: string; files: File[] } },
+    @ConnectedSocket() client: Socket,
+  ) {
+    try {
+      console.log(data.files);
+      const { remote, files, newStash } = data;
+      const f = files.map(e => e.path);
+      const args = ["-C", remote.path, "stash", "push", "-m", "--", newStash.message, ...f];
+
+      const { stdout } = await execFileAsync("git", args);
+      this.logger.log(stdout);
+
+
+      client.emit('git_stash_push_response', { success: true, stash: newStash });
+    } catch (e) {
+      this.logger.log(e.message);
+      client.emit('git_stash_push_response', {
+        success: false,
+        error: e?.message || 'stash 실패',
+      });
+    }
+  }
 }

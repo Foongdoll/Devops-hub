@@ -86,14 +86,22 @@ const GitManager = () => {
         {git.tab === "stash" && (
           <StashPanel
             stashes={git.stashes}
+            onCreate={git.createStash}
             onApply={git.applyStash}
             onDrop={git.dropStash}
             onSelect={git.selectStash}
             selectedStash={git.selectedStash}
-            files={git.stashFiles}
-            onFileSelect={git.selectStashFile}
-            selectedFile={git.selectedStashFile}
-            diff={git.stashDiff}
+            stashFiles={git.stashFiles}
+            onStashFileSelect={git.onStashFileSelect}
+            selectedStashFile={git.selectedStashFile}
+            diff={git.stashDiff}            
+            onFetchStashChanges={git.fetchStashChanges}            
+            stashChangedFiles={git.stashChangedFiles}
+            setStashChangedFiles={git.setStashChangedFiles}
+            selectedChangedFiles={git.selectedChangedFiles}           
+            setSelectedChangedFiles={git.setSelectedChangedFiles}     
+            setStashMessage={git.setStashMessage}
+            stashMessage={git.stashMessage}              
           />
         )}
         <ConflictModal

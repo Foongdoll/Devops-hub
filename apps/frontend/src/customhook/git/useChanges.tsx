@@ -58,7 +58,7 @@ export function useChanges(initialUnstaged: File[] = [], initialStaged: File[] =
     if (stagedFiles.length && commitMsg.trim()) {
       setStagedFiles([]);
       setCommitMsg('');
-    }    
+    }
     showLoading({ message: '커밋 진행 중...' });
     emit('git_commit', { remote: remote, files: stagedFiles, message: commitMsg, remoteBranch: selectedRemoteBranch, isPush: isPush });
 
@@ -69,22 +69,21 @@ export function useChanges(initialUnstaged: File[] = [], initialStaged: File[] =
     setStagedFiles([]);
     setUnstagedFiles([]);
     setFileDiff('');
-    emit('fetch_changed_files', {remote: remote});
+    emit('fetch_changed_files', { remote: remote });
   }
 
   // 선택
-  const handleToggleLine = (lineIdx: number) => {
+  const handleToggleLine = (lineNumber: number) => {
     setSelectedLines((prev) =>
-      prev.includes(lineIdx)
-        ? prev.filter(idx => idx !== lineIdx)
-        : [...prev, lineIdx]
+      prev.includes(lineNumber)
+        ? prev.filter(idx => idx !== lineNumber)
+        : [...prev, lineNumber]
     );
   };
 
 
   // lines가 없으면 전체, 있으면 부분 discard
   const onDiscard = (remote: Remote, file: File, lines?: number[]) => {
-    console.log('Discarding file:', file, 'Lines:', lines, 'Remote:', remote);
     if (!lines) {
       // 전체 discard 처리 (예: 서버/소켓 emit 등)
       emit('discard_all', { remote: remote, filePath: file.path });
@@ -96,7 +95,7 @@ export function useChanges(initialUnstaged: File[] = [], initialStaged: File[] =
 
 
   // 로컬 브랜치 체크아웃 중 충돌 난 파일 커밋, 푸시 처리
-  const onCheckoutRemoteBranch = (remote: Remote, conflictFiles: File[], isPush: boolean, remoteBranch: string) => {    
+  const onCheckoutRemoteBranch = (remote: Remote, conflictFiles: File[], isPush: boolean, remoteBranch: string) => {
     showLoading({ message: '충돌 파일들 커밋 중...' });
     emit('git_commit', {
       remote,
@@ -109,28 +108,33 @@ export function useChanges(initialUnstaged: File[] = [], initialStaged: File[] =
   };
 
   // 로컬 브랜치 체크아웃 중 충돌 난 파일들 버림 처리
-  const onCheckoutConflictFilesDiscard = useCallback((remote: Remote, conflictFiles: File[], selectedLocalBranch: string) => {
-
+  const onCheckoutConflictFilesDiscard = useCallback((remote: Remote, conflictFiles: File[]) => {
+    showLoading({ message: '파일 버림 중...' });
+    emit('discard_file', { remote: remote, files: conflictFiles });
   }, []);
 
 
 
   useEffect(() => {
     // 변경 파일 리스트 조회
-    on('fetch_changed_files_response', (data: { status: string; path: string, staged: boolean }[]) => {
+    on('fetch_changed_files_response', (data: { changedFiles: { status: string; path: string, staged: boolean }[], discard?: boolean }) => {
       if (data) {
         const staged: File[] = [];
         const unstaged: File[] = [];
-        data.forEach(({ status, path, staged: isStaged }) => {
+        data.changedFiles.forEach(({ status, path, staged: isStaged }) => {
           const file = { status, path, name: path, staged: isStaged } as File;
           if (!file.path) return;
           if (isStaged) staged.push(file);
           else unstaged.push(file);
         });
-        
+
         setStagedFiles(staged);
         setUnstagedFiles(unstaged);
-        setFileDiff('');
+
+        emit('fetch_change_count', { remote:selectedRemote });
+        if (!data.discard) {
+          setFileDiff('');
+        }
       }
     });
 
@@ -158,7 +162,7 @@ export function useChanges(initialUnstaged: File[] = [], initialStaged: File[] =
           showToast('커밋이 실패하였습니다.', 'error');
           setSocketResponse(false);
         }
-      } catch (error : any) {
+      } catch (error: any) {
         showToast(error.message, 'error');
       } finally {
         emit('fetch_changed_files', { remote: response.remote });
@@ -175,7 +179,6 @@ export function useChanges(initialUnstaged: File[] = [], initialStaged: File[] =
         setLeft(data.left);
         setRight(data.right);
         data.message && showToast(data.message, 'error');
-
       }
     );
 
@@ -191,6 +194,65 @@ export function useChanges(initialUnstaged: File[] = [], initialStaged: File[] =
         setConflictModalOpen(false);
       }
     });
+
+    on('discard_file_response', async (data: { success: boolean, message: string, files: [] }) => {
+      await delay(500);
+      hideLoading();
+      if (data.success) {
+        showToast('파일이 성공적으로 버려졌습니다.', 'success');
+        setSocketResponse(true);
+
+      } else {
+        showToast(`파일 버리기 실패: ${data.message}`, 'error');
+        setSocketResponse(false);
+      }
+      emit('fetch_changed_files', { remote: selectedRemote });
+    });
+
+    on('discard_all_response', async (data: { success: boolean, filePath: string, error?: string }) => {
+      await delay(500);
+      hideLoading();
+      if (data.success) {
+        showToast(`파일 ${data.filePath}이 성공적으로 버려졌습니다.`, 'success');
+        setSocketResponse(true);
+      } else {
+        showToast(`파일 ${data.filePath} 버리기 실패: ${data.error}`, 'error');
+        setSocketResponse(false);
+      }
+      emit('fetch_changed_files', { remote: selectedRemote });
+    });
+
+
+    on('discard_lines_response', async (data: {
+      success: boolean,
+      message: string,
+      remote: Remote,
+      filePath: string,
+      lines: number[]
+    }) => {
+      await delay(500);
+      hideLoading();
+
+      if (data.success) {
+        showToast(`선택한 라인이 성공적으로 버려졌습니다.`, 'success');
+        setSocketResponse(true);
+        setSelectedLines([]);
+        // ✅ 서버 동기화를 위한 최신 상태 요청
+        emit('fetch_changed_files', { remote: data.remote, discard: true });
+        emit('fetch_file_diff', {
+          remote: data.remote,
+          filePath: data.filePath,
+          fileStaged: false
+        });
+
+      } else {
+        showToast(`선택한 라인 버리기 실패: ${data.message}`, 'error');
+        setSocketResponse(false);
+      }
+    });
+
+
+
 
     return () => {
       off('fetch_changed_files_response');

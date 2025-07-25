@@ -45,7 +45,7 @@ const ChangesPanel: React.FC<ChangesPanelProps> = ({
 }) => {
 
   const { selectedRemote, selectedLocalBranch, selectedRemoteBranch, localBranches, remoteBranches } = useRemoteContext();
-  const [isPush, setIsPush] = useState(false); 
+  const [isPush, setIsPush] = useState(false);
   const { emit } = useGitSocket();
 
   useEffect(() => {
@@ -58,7 +58,11 @@ const ChangesPanel: React.FC<ChangesPanelProps> = ({
   // ✅ 선택 초기화(파일 변경시)
   useEffect(() => {
     onSelectedLines([]);
-  }, [selectedFile, diff]);
+  }, [selectedFile]);
+
+
+  console.log(diff);
+  console.log(selectedLines);
 
   return (
     <section className="flex flex-col md:flex-row h-[calc(100vh-220px)] gap-6 px-6 py-6">
@@ -151,8 +155,7 @@ const ChangesPanel: React.FC<ChangesPanelProps> = ({
             disabled={!selectedFile || selectedLines.length === 0}
             onClick={() => {
               if (selectedFile && selectedLines.length > 0) {
-                onDiscard(selectedRemote || {} as Remote, selectedFile, selectedLines);
-                onSelectedLines([]);
+                onDiscard(selectedRemote || {} as Remote, selectedFile, selectedLines);                
               }
             }}
           >
@@ -161,15 +164,13 @@ const ChangesPanel: React.FC<ChangesPanelProps> = ({
         </div>
         <div className="bg-gray-900 rounded-lg shadow p-4 flex-1 overflow-y-auto">
           {selectedFile && diff ? (
-
             <div className="font-mono text-sm text-gray-100 w-fit min-w-full">
               {(() => {
-                let oldLine = 0;
-                let newLine = 0;
-                let inHunk = false;
+                let oldLineNum = 0;
+                let newLineNum = 0;
 
                 return diff.split('\n').flatMap((line, index) => {
-                  // 1. 헤더(메타) 라인
+                  // 1. diff 헤더 제거
                   if (
                     line.startsWith('diff --git') ||
                     line.startsWith('index') ||
@@ -179,68 +180,88 @@ const ChangesPanel: React.FC<ChangesPanelProps> = ({
                     return [];
                   }
 
-                  // 2. hunk header (@@ ...)
+                  // 2. hunk 시작 부분 → 줄 번호 초기화
                   if (line.startsWith('@@')) {
-                    inHunk = true;
-                    const headerMatch = /(@@ [^@]+ @@)(.*)/.exec(line);
-                    let header = headerMatch?.[1] ?? line;
-                    return [
-                      <div key={`hunk-${index}`} className="flex items-center font-bold bg-yellow-800/70 text-yellow-200 border-t border-b border-yellow-500/50 py-1">
-                        <span className="w-6" /> {/* 빈칸 (체크박스 자리) */}
+                    const match = /@@ -(\d+),?\d* \+(\d+),?\d*/.exec(line);
+                    if (match) {
+                      oldLineNum = parseInt(match[1], 10);
+                      newLineNum = parseInt(match[2], 10);
+                    }
+
+                    const header = match ? line : `Hunk ${index}`;
+                    return (
+                      <div
+                        key={`hunk-${index}`}
+                        className="flex items-center font-bold bg-yellow-800/70 text-yellow-200 border-t border-b border-yellow-500/50 py-1"
+                      >
+                        <span className="w-6" />
                         <span className="w-9 text-xs opacity-40" />
                         <span className="w-9 text-xs opacity-40" />
                         <span className="ml-2">{header}</span>
                       </div>
-                    ];
+                    );
                   }
 
-                  // 3. 본문 라인
-                  // 라인 번호, 색상, 아이콘, 체크박스 관리
+                  // 3. 본문 라인 상태 초기화
                   let displayOld: string | number = '';
                   let displayNew: string | number = '';
                   let bgClass = '';
                   let icon = null;
                   let textClass = '';
                   let isSelectable = false;
+                  let actualLineNumber: number | null = null;
 
                   if (line.startsWith('+')) {
                     displayOld = '';
-                    displayNew = newLine++;
+                    displayNew = newLineNum;
+                    actualLineNumber = newLineNum;
+                    newLineNum++;
                     bgClass = 'bg-green-950 hover:bg-green-900';
                     textClass = 'text-green-300';
                     icon = <Plus size={16} className="inline-block text-green-400 mr-1" />;
                     isSelectable = true;
                   } else if (line.startsWith('-')) {
-                    displayOld = oldLine++;
+                    displayOld = oldLineNum;
                     displayNew = '';
+                    actualLineNumber = oldLineNum;
+                    oldLineNum++;
                     bgClass = 'bg-rose-950 hover:bg-rose-900';
                     textClass = 'text-rose-300';
                     icon = <Minus size={16} className="inline-block text-rose-400 mr-1" />;
                     isSelectable = true;
                   } else {
-                    displayOld = oldLine++;
-                    displayNew = newLine++;
+                    displayOld = oldLineNum;
+                    displayNew = newLineNum;
+                    actualLineNumber = newLineNum;
+                    oldLineNum++;
+                    newLineNum++;
                     bgClass = 'bg-gray-800 hover:bg-gray-700';
                     textClass = 'text-gray-400';
                     icon = null;
-                    isSelectable = true;
+                    isSelectable = false;
                   }
 
                   return (
                     <div
                       key={index}
-                      className={`flex items-center group border-b border-gray-700/60 ${bgClass} ${selectedLines.includes(index) ? "ring-2 ring-purple-400 z-10" : ""}`}
+                      data-line-number={actualLineNumber ?? undefined}
+                      data-index={index}
+                      className={`flex items-center group border-b border-gray-700/60 ${bgClass} ${selectedLines.includes(actualLineNumber)
+                          ? 'ring-2 ring-purple-400 z-10'
+                          : ''
+                        }`}
                     >
                       {/* 체크박스 */}
                       <span className="w-6 flex justify-center">
                         {isSelectable && (
                           <input
                             type="checkbox"
-                            checked={selectedLines.includes(index)}
-                            onChange={() => handleToggleLine(index)}
+                            checked={selectedLines.includes(actualLineNumber)}
+                            onChange={() => handleToggleLine(actualLineNumber)}
                             className="accent-purple-600"
                             title="이 줄 선택"
                           />
+
                         )}
                       </span>
                       {/* 삭제 전 라인 번호 */}
@@ -266,6 +287,7 @@ const ChangesPanel: React.FC<ChangesPanelProps> = ({
               파일을 선택하면 변경사항을 미리볼 수 있습니다.
             </div>
           )}
+
         </div>
         <div className="mt-4 flex gap-2">
           <textarea

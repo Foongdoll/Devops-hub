@@ -71,9 +71,6 @@ export const useGitManager = () => {
     on('fetch_commit_count_response', fetch_commit_count_response)
     on('fetch_pull_request_count_response', fetch_pull_request_count_response)
 
-    emit('fetch_pull_request_count', { remote: selectedRemote, remoteBranch: selectedRemoteBranch });
-    emit('fetch_commit_count', { remote: selectedRemote, remoteBranch: selectedRemoteBranch });
-    emit('fetch_change_count', { remote: selectedRemote });
     on('fetch_change_count_response', (data: { count: number, message?: string }) => {
       if (data.message) {
         showToast(data.message, 'error');
@@ -81,6 +78,17 @@ export const useGitManager = () => {
       }
       setChangesCount(data.count);
     });
+
+
+    if (selectedRemote && selectedRemoteBranch) {
+      emit('fetch_pull_request_count', { remote: selectedRemote, remoteBranch: selectedRemoteBranch });
+      emit('fetch_commit_count', { remote: selectedRemote, remoteBranch: selectedRemoteBranch });
+    }
+    if (selectedRemote) {
+      emit('fetch_change_count', { remote: selectedRemote });
+    }
+
+
 
     return () => {
       off('fetch_change_count_response');
