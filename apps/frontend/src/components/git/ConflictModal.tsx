@@ -421,7 +421,7 @@ function TitleAndFiles({
                             <button
                                 className="w-full px-2 py-2 rounded-lg border border-gray-400 bg-white text-gray-500 font-semibold hover:bg-red-50 hover:text-red-500 transition flex items-center justify-center gap-1 text-sm"
                                 onClick={async () => {
-                                    // showConfirm & 버리기 핸들러 연결
+                                    onCheckoutConflictFilesDiscard(selectedRemote || {} as Remote, selectedConflictFiles, selectedLocalBranch);
                                 }}
                             >
                                 <X size={16} /> 변경사항 버리기

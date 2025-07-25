@@ -8,7 +8,7 @@ export function useStash(initial: Stash[] = []) {
   const [selectedStash, setSelectedStash] = useState<Stash | null>(null);
   const [stashFiles, setStashFiles] = useState<File[]>([]);
   const [selectedStashFile, setSelectedStashFile] = useState<File | null>(null);
-  const [stashDiff, setStashDiff] = useState<string>('');  
+  const [stashDiff, setStashDiff] = useState<string>('');
 
   const applyStash = useCallback((stash: Stash) => {
     setStashes(prev => prev.filter(s => s.name !== stash.name));
@@ -29,7 +29,16 @@ export function useStash(initial: Stash[] = []) {
 
   // 로컬 브랜치 체크아웃 중 충돌 난 파일 스테시 
   const onCheckoutConflictFilesStash = useCallback((remote: Remote, conflictFiles: File[]) => {
+    if (conflictFiles.length === 0) return;
 
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const newStash: Stash = {
+      name: `stash@{${stashes.length}}`, // 또는 `stash-${timestamp}`
+      message: `Checkout conflict from ${remote.name}`,
+      files: conflictFiles,
+    };
+
+    setStashes(prev => [newStash, ...prev]);
   }, []);
 
 
