@@ -360,13 +360,6 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
   ) {
     try {
 
-      console.log(files);
-      console.log(message);
-      console.log(remoteBranch);
-      console.log(isPush)
-      console.log(remote);
-
-
       if (!files.length || !message.trim()) {
         socket.emit('git_commit_response', { success: false, message: 'No files to commit or empty commit message' });
         return;
@@ -738,4 +731,27 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
       socket.emit('fetch_change_count_response', { count: 0, message: error.message });
     }
   }
+
+  @SubscribeMessage('discard_file')
+  async handleDiscardFile(
+    @MessageBody() data: { remote: Remote; files: { path: string; staged: boolean; }[] },
+    @ConnectedSocket() socket: Socket
+  ) {
+
+    const { remote, files } = data;
+
+    try {
+      const filePaths = files.map(file => file.path);
+      const args = ['-C', remote.path, 'restore', ...filePaths];
+
+      await execFileAsync('git', args);
+
+      // 응답 보내기 (선택)
+      socket.emit('discard_success', { files: filePaths });
+    } catch (error) {
+      console.error('Discard error:', error);
+      socket.emit('discard_error', { error: error.message });
+    }
+  }
+
 }
