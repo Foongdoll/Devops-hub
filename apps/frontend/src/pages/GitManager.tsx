@@ -14,7 +14,18 @@ const GitManager = () => {
   const { conflictModalOpen, setConflictModalOpen, } = useRemoteContext();
 
   return (
-    <div className="flex flex-col w-full h-full bg-gray-950 text-gray-100">
+    <div
+      className="
+        flex flex-col w-full h-full
+        bg-gradient-to-br from-[#211843] via-[#2e2466] to-[#6657a8]
+        text-[#ebeaf9]
+        rounded-2xl
+        shadow-[0_6px_32px_0_rgba(126,76,255,0.14)]
+        border border-[#4f389a]/30
+        transition-all
+        overflow-hidden
+      "
+    >
       <TabNav active={git.tab} onChange={git.setTab} selectedRemote={git.selectedRemote}>
         <TopActionBar
           onPush={git.push}
@@ -56,7 +67,7 @@ const GitManager = () => {
         {git.tab === "changes" && (
           <ChangesPanel
             unstagedFiles={git.unstagedFiles}
-            setUnstagedFiles={git.setUnstagedFiles}            
+            setUnstagedFiles={git.setUnstagedFiles}
             stagedFiles={git.stagedFiles}
             setStagedFiles={git.setStagedFiles}
             onStage={git.stageFile}
@@ -96,14 +107,14 @@ const GitManager = () => {
             stashFiles={git.stashFiles}
             onStashFileSelect={git.onStashFileSelect}
             selectedStashFile={git.selectedStashFile}
-            diff={git.stashDiff}            
-            onFetchStashChangeFiles={git.fetchStashChangeFiles}            
+            diff={git.stashDiff}
+            onFetchStashChangeFiles={git.fetchStashChangeFiles}
             stashChangedFiles={git.stashChangedFiles}
             setStashChangedFiles={git.setStashChangedFiles}
-            selectedChangedFiles={git.selectedChangedFiles}           
-            setSelectedChangedFiles={git.setSelectedChangedFiles}     
+            selectedChangedFiles={git.selectedChangedFiles}
+            setSelectedChangedFiles={git.setSelectedChangedFiles}
             setStashMessage={git.setStashMessage}
-            stashMessage={git.stashMessage}    
+            stashMessage={git.stashMessage}
             onFetchStashs={git.fetchStashs}
           />
         )}

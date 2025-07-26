@@ -22,9 +22,6 @@ export function SftpFileManager({ sftp }: { sftp?: SftpState }) {
     toggleSelect, handleDownloadSelected
   } = sftp;
 
-  
-
-  // 최초 연결 시 pwd+루트 트리 요청
   useEffect(() => {
     if (!socket) return;
     const onPwd = (path: string) => {
@@ -37,7 +34,6 @@ export function SftpFileManager({ sftp }: { sftp?: SftpState }) {
     return () => { socket.off("sftp-pwd", onPwd); };
   }, [socket, emit]);
 
-  // 폴더 리스트 수신
   useEffect(() => {
     if (!socket) return;
     const onData = ({ remotePath, list }: ListData) => {
@@ -47,13 +43,11 @@ export function SftpFileManager({ sftp }: { sftp?: SftpState }) {
     return () => { socket.off("sftp-list-data", onData); };
   }, [socket]);
 
-  // 탐색기 폴더 이동
   const goTo = (dir: string) => {
     setCwd(dir);
     emit("sftp-list", { remotePath: dir });
   };
 
-  // 트리 폴더 펼침
   const toggleDir = (path: string) => {
     setOpenDirs(prev => {
       const next = new Set(prev);
@@ -66,20 +60,16 @@ export function SftpFileManager({ sftp }: { sftp?: SftpState }) {
     });
   };
 
-  // **폴더/파일 더블클릭**
   const onEntryDoubleClick = (entry: Entry) => {
     if (entry.type === "d") {
-
       const nextDir = cwd === "/" ? `/${entry.name}` : `${cwd}/${entry.name}`;
-      setSearch(""); // 검색 초기화
+      setSearch("");
       goTo(nextDir);
     } else {
-      // 파일: vi/vim 다이얼로그
       setFileDialog({ file: entry, path: cwd });
     }
   };
 
-  // **파일 열기: vi/vim 선택 후 터미널 명령 전송**
   const handleOpenFile = (editor: "vi" | "vim") => {
     if (!fileDialog) return;
     const filePath =
@@ -90,7 +80,6 @@ export function SftpFileManager({ sftp }: { sftp?: SftpState }) {
     setFileDialog(null);
   };
 
-  // **A안: 탐색기**
   const renderExplorer = () => {
     const filtered = search.trim()
       ? (tree[cwd] || []).filter(e => e.name.toLowerCase().includes(search.trim().toLowerCase()))
@@ -101,7 +90,6 @@ export function SftpFileManager({ sftp }: { sftp?: SftpState }) {
         onDragOver={e => { e.preventDefault(); e.stopPropagation(); }}
         onDrop={e => {
           e.preventDefault(); e.stopPropagation();
-          // 로컬 업로드만 허용
           if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
             setLoading(true)
             const files = Array.from(e.dataTransfer.files);
@@ -125,9 +113,13 @@ export function SftpFileManager({ sftp }: { sftp?: SftpState }) {
       >
         {cwd !== "/" && (
           <li
-            className={`flex items-center text-[#94a7e1] cursor-pointer rounded px-2 py-1 mb-1 transition
-      hover:bg-[#262753]
-      ${dropTarget === "상위 폴더" ? "bg-[#483c77]/70 ring-2 ring-[#7a80fc]" : ""}`}
+            className={`
+              flex items-center cursor-pointer rounded-lg px-2 py-1 mb-1
+              font-semibold text-[#7068c4] hover:text-[#5746af]
+              bg-white/80 hover:bg-[#ede9fe]
+              border border-transparent hover:border-[#7a80fc] transition
+              ${dropTarget === "상위 폴더" ? "bg-[#ede9fe] border-[#7a80fc] shadow" : ""}
+            `}
             onDoubleClick={() => goTo(cwd.replace(/\/[^/]+$/, "") || "/")}
             onDragOver={e => { e.preventDefault(); setDropTarget('상위 폴더'); }}
             onDragLeave={() => setDropTarget(null)}
@@ -154,124 +146,122 @@ export function SftpFileManager({ sftp }: { sftp?: SftpState }) {
             <span className="font-medium select-none">상위 폴더</span>
           </li>
         )}
-        {
-          filtered.length === 0 && (
-            <li className="text-xs text-[#a0a0bc] px-2 py-1 select-none">결과 없음</li>
-          )
-        }
-        {
-          filtered.map(entry => {
-            // =========== 상태 분석 ===========
-            const fullPath = cwd === "/" ? `/${entry.name}` : `${cwd}/${entry.name}`;
-            const isHidden = entry.name.startsWith(".");
-            const isConfig = /\.(conf|ini|env|json|yaml|yml)$/i.test(entry.name);
-            const isExecutable = entry.longname?.substring(3, 6).includes("x");
-            let icon = null, textClass = "", subLabel = null;
+        {filtered.length === 0 && (
+          <li className="text-xs text-[#aaaaca] px-2 py-1 select-none">결과 없음</li>
+        )}
+        {filtered.map(entry => {
+          const fullPath = cwd === "/" ? `/${entry.name}` : `${cwd}/${entry.name}`;
+          const isSelected = selected.includes(fullPath);
+          const isDir = entry.type === "d";
 
-            if (entry.type === "d") {
-              icon = <Folder size={17} className="text-[#6b83ee] min-w-[20px]" />;
-              textClass = isHidden ? "opacity-60 italic" : "";
-            } else if (entry.type === "l") {
-              icon = <Link2 size={16} className="text-[#f0d36b] min-w-[20px]" />;
-              textClass = "text-[#f0d36b]";
-              subLabel = <span className="ml-2 text-[#ffe87b] text-xs font-mono">(링크)</span>;
-            } else if (isConfig) {
-              icon = <Cog size={16} className="text-[#6bc0ee] min-w-[20px]" />;
-              textClass = "text-[#6bc0ee]";
-              subLabel = <span className="ml-2 text-[#6bc0ee] text-xs font-mono">(설정)</span>;
-            } else if (isExecutable) {
-              icon = <Terminal size={16} className="text-[#7ae67a] min-w-[20px]" />;
-              textClass = "text-[#7ae67a]";
-              subLabel = <span className="ml-2 text-[#8af79f] text-xs font-mono">(실행)</span>;
-            } else if (isHidden) {
-              icon = <EyeOff size={16} className="text-[#b8b8c8] min-w-[20px]" />;
-              textClass = "opacity-60 italic";
-              subLabel = <span className="ml-2 text-[#bbbfd8] text-xs font-mono">(숨김)</span>;
-            } else {
-              icon = <File size={16} className="text-[#c1b9d8] min-w-[20px]" />;
-            }
+          let icon = <File size={16} className="text-[#b3b6d9]" />;
+          let textClass = "text-[#423e6d]";
+          let subLabel = null;
 
-            return (
-              <li
-                key={entry.name}
-                className={`
-                  flex items-center gap-2 cursor-pointer rounded px-2 py-1 transition
-                  ${selected.includes(fullPath) ? "bg-[#7a80fc]/80 text-white font-semibold" : ""}
-                  ${entry.type === "d" ? "hover:bg-[#212a48] text-[#f1f2ff]" : "hover:bg-[#191a3c] text-[#8da7cf]"}
-                  ${dragging === entry.name ? "ring-2 ring-[#ffbe6f] bg-[#3c3462] scale-105" : ""}
-                  ${dropTarget === entry.name ? "bg-[#2835a7]/40 ring-2 ring-[#7a80fc]" : ""}
-                  ${textClass}
-                `}
-                onClick={e => toggleSelect(e, fullPath)}
-                onDoubleClick={() => onEntryDoubleClick(entry)}
-                draggable={entry.type !== "d"}
-                onDragStart={e => {
-                  if (entry.type !== "d") {
-                    setDragging(entry.name);
-                    e.dataTransfer.setData(
-                      "application/sftp-file",
-                      JSON.stringify({ name: entry.name, srcDir: cwd })
-                    );
-                  }
-                }}
-                onDragEnd={() => setDragging(null)}
-                onDragOver={entry.type === "d" ? (e => {
-                  e.preventDefault();
-                  setDropTarget(entry.name);
-                }) : undefined}
-                onDragLeave={entry.type === "d" ? (() => setDropTarget(null)) : undefined}
-                onDrop={entry.type === "d" ? (e => {
-                  setDropTarget(null);
-                  setDragging(null);
-                  setLoading(true);
-                  const data = e.dataTransfer.getData("application/sftp-file");
-                  if (data) {
-                    const { name, srcDir } = JSON.parse(data);
-                    if (srcDir !== (cwd === "/" ? `/${entry.name}` : `${cwd}/${entry.name}`)) {
-                      emit("sftp-move", {
-                        src: srcDir === "/" ? `/${name}` : `${srcDir}/${name}`,
-                        dest:
-                          cwd === "/"
-                            ? `/${entry.name}/${name}`
-                            : `${cwd}/${entry.name}/${name}`,
-                      });
-                      showToast(`"${name}" 이동 완료!`, "success");
-                      handleRefresh();
-                      setLoading(false);
-                    }
-                  }
-                  // 로컬 업로드
-                  if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-                    const files = Array.from(e.dataTransfer.files);
-                    for (let file of files) {
-                      const reader = new FileReader();
-                      reader.onload = () => {
-                        const base64 = (reader.result as string).split(",")[1];
-                        emit("sftp-upload", {
-                          remotePath: `${cwd}/${entry.name}`,
-                          fileName: file.name,
-                          data: base64,
-                        });
-                      };
-                      reader.readAsDataURL(file);
-                    }
-                    showToast(`${e.dataTransfer.files.length} 개 파일 전송 완료`, "success");
+          if (isDir) {
+            icon = <Folder size={17} className="text-[#887bff]" />;
+            textClass = entry.name.startsWith(".") ? "opacity-50 italic" : "font-semibold";
+          } else if (entry.type === "l") {
+            icon = <Link2 size={16} className="text-[#eab12f]" />;
+            textClass = "text-[#eab12f]";
+            subLabel = <span className="ml-2 text-[#ffe87b] text-xs font-mono">(링크)</span>;
+          } else if (/\.(conf|ini|env|json|yaml|yml)$/i.test(entry.name)) {
+            icon = <Cog size={16} className="text-[#52b8e5]" />;
+            textClass = "text-[#3682a6]";
+            subLabel = <span className="ml-2 text-[#52b8e5] text-xs font-mono">(설정)</span>;
+          } else if (entry.longname?.substring(3, 6).includes("x")) {
+            icon = <Terminal size={16} className="text-[#49e7b7]" />;
+            textClass = "text-[#31b286]";
+            subLabel = <span className="ml-2 text-[#79e5bd] text-xs font-mono">(실행)</span>;
+          } else if (entry.name.startsWith(".")) {
+            icon = <EyeOff size={16} className="text-[#cac9de]" />;
+            textClass = "opacity-60 italic";
+            subLabel = <span className="ml-2 text-[#d5d4ef] text-xs font-mono">(숨김)</span>;
+          }
+
+          return (
+            <li
+              key={entry.name}
+              className={`
+                flex items-center gap-2 cursor-pointer rounded-lg px-2 py-1 transition-all
+                border border-transparent
+                ${isSelected
+                  ? "bg-gradient-to-r from-[#7a80fc]/90 to-[#bba7ee]/90 text-white font-bold border-[#7a80fc] shadow"
+                  : isDir
+                    ? "hover:bg-[#ede9fe] hover:text-[#6f52e4] hover:border-[#7a80fc] text-[#423e6d]"
+                    : "hover:bg-[#f7f6fa] hover:text-[#7068c4] hover:border-[#c3b4fa] text-[#6b6b87]"}
+                ${dragging === entry.name ? "ring-2 ring-[#ffbe6f] bg-[#e8e5fd] scale-105" : ""}
+                ${dropTarget === entry.name ? "bg-[#ede9fe] border-[#7a80fc]" : ""}
+                ${textClass}
+              `}
+              onClick={e => toggleSelect(e, fullPath)}
+              onDoubleClick={() => onEntryDoubleClick(entry)}
+              draggable={entry.type !== "d"}
+              onDragStart={e => {
+                if (entry.type !== "d") {
+                  setDragging(entry.name);
+                  e.dataTransfer.setData(
+                    "application/sftp-file",
+                    JSON.stringify({ name: entry.name, srcDir: cwd })
+                  );
+                }
+              }}
+              onDragEnd={() => setDragging(null)}
+              onDragOver={entry.type === "d" ? (e => {
+                e.preventDefault();
+                setDropTarget(entry.name);
+              }) : undefined}
+              onDragLeave={entry.type === "d" ? (() => setDropTarget(null)) : undefined}
+              onDrop={entry.type === "d" ? (e => {
+                setDropTarget(null);
+                setDragging(null);
+                setLoading(true);
+                const data = e.dataTransfer.getData("application/sftp-file");
+                if (data) {
+                  const { name, srcDir } = JSON.parse(data);
+                  if (srcDir !== (cwd === "/" ? `/${entry.name}` : `${cwd}/${entry.name}`)) {
+                    emit("sftp-move", {
+                      src: srcDir === "/" ? `/${name}` : `${srcDir}/${name}`,
+                      dest:
+                        cwd === "/"
+                          ? `/${entry.name}/${name}`
+                          : `${cwd}/${entry.name}/${name}`,
+                    });
+                    showToast(`"${name}" 이동 완료!`, "success");
                     handleRefresh();
                     setLoading(false);
                   }
-                }) : undefined}
-              >
-                {icon}
-                <span className="truncate">
-                  {entry.name}
-                  {subLabel}
-                </span>
-              </li>
-            );
-          })
-        }
+                }
+                if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                  const files = Array.from(e.dataTransfer.files);
+                  for (let file of files) {
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                      const base64 = (reader.result as string).split(",")[1];
+                      emit("sftp-upload", {
+                        remotePath: `${cwd}/${entry.name}`,
+                        fileName: file.name,
+                        data: base64,
+                      });
+                    };
+                    reader.readAsDataURL(file);
+                  }
+                  showToast(`${e.dataTransfer.files.length} 개 파일 전송 완료`, "success");
+                  handleRefresh();
+                  setLoading(false);
+                }
+              }) : undefined}
+            >
+              {icon}
+              <span className="truncate">
+                {entry.name}
+                {subLabel}
+              </span>
+            </li>
+          );
+        })}
       </ul>
-    )
+    );
   };
 
   const renderTree = (path: string, depth = 0) => {
@@ -280,53 +270,48 @@ export function SftpFileManager({ sftp }: { sftp?: SftpState }) {
       <ul className="pl-0 m-0 list-none">
         {list.map((entry) => {
           const fullPath = path === "/" ? `/${entry.name}` : `${path}/${entry.name}`;
-          // ========== ① entry별 속성 계산 ==========
-          const isHidden = entry.name.startsWith(".");
-          const isConfig = /\.(conf|ini|env|json|yaml|yml)$/i.test(entry.name);
-          const isExecutable = entry.longname?.substring(3, 6).includes("x");
-          let icon = null, textClass = "", subLabel = null;
+          const isOpen = openDirs.has(fullPath);
+          const isDir = entry.type === "d";
+          const isSelected = selected.includes(fullPath);
 
-          if (entry.type === "d") {
-            // 디렉터리
-            icon = <Folder size={14} color="#7b85b1" className="mr-2" />;
-            textClass = isHidden ? "opacity-60 italic" : "";
+          let icon = <File size={14} className="mr-2 text-[#b3b6d9]" />;
+          let textClass = "text-[#423e6d]";
+          let subLabel = null;
+
+          if (isDir) {
+            icon = <Folder size={14} className="mr-2 text-[#887bff]" />;
+            textClass = entry.name.startsWith(".") ? "opacity-50 italic" : "font-semibold";
           } else if (entry.type === "l") {
-            // 링크
-            icon = <Link2 size={14} className="mr-2 text-[#f8d568]" />;
-            textClass = "text-[#f8d568]";
+            icon = <Link2 size={14} className="mr-2 text-[#eab12f]" />;
+            textClass = "text-[#eab12f]";
             subLabel = <span className="ml-2 text-xs text-[#ffe87b]">(링크)</span>;
-          } else if (isConfig) {
-            // 설정파일
-            icon = <Cog size={14} className="mr-2 text-[#6bc0ee]" />;
-            textClass = "text-[#6bc0ee]";
-            subLabel = <span className="ml-2 text-xs text-[#6bc0ee]">(설정)</span>;
-          } else if (isExecutable) {
-            // 실행파일
-            icon = <Terminal size={14} className="mr-2 text-[#7ae67a]" />;
-            textClass = "text-[#7ae67a]";
-            subLabel = <span className="ml-2 text-xs text-[#8af79f]">(실행)</span>;
-          } else if (isHidden) {
-            // 숨김파일
-            icon = <EyeOff size={14} className="mr-2 text-[#b8b8c8]" />;
+          } else if (/\.(conf|ini|env|json|yaml|yml)$/i.test(entry.name)) {
+            icon = <Cog size={14} className="mr-2 text-[#52b8e5]" />;
+            textClass = "text-[#3682a6]";
+            subLabel = <span className="ml-2 text-xs text-[#52b8e5]">(설정)</span>;
+          } else if (entry.longname?.substring(3, 6).includes("x")) {
+            icon = <Terminal size={14} className="mr-2 text-[#49e7b7]" />;
+            textClass = "text-[#31b286]";
+            subLabel = <span className="ml-2 text-xs text-[#79e5bd]">(실행)</span>;
+          } else if (entry.name.startsWith(".")) {
+            icon = <EyeOff size={14} className="mr-2 text-[#cac9de]" />;
             textClass = "opacity-60 italic";
-            subLabel = <span className="ml-2 text-xs text-[#bbbfd8]">(숨김)</span>;
-          } else {
-            // 일반파일
-            icon = <File size={14} className="mr-2 text-[#c1b9d8]" />;
+            subLabel = <span className="ml-2 text-xs text-[#d5d4ef]">(숨김)</span>;
           }
 
-          // ========== ② 렌더링 ==========
-          if (entry.type === "d") {
-            const isOpen = openDirs.has(fullPath);
+          if (isDir) {
             return (
               <li key={fullPath}>
                 <div
-                  className={`flex items-center rounded-sm font-medium transition-colors cursor-pointer ${textClass}
-                  ${isOpen ? "bg-[#232347] text-[#c3c7e6]" : ""}
-                  hover:bg-[#28294b] hover:text-[#dadcfb]`}
+                  className={`
+                    flex items-center rounded-lg font-medium cursor-pointer transition-all
+                    border-l-4 border-transparent
+                    ${isOpen ? "bg-[#e8e5fd] border-l-4 border-[#7a80fc] shadow-inner" : ""}
+                    ${isSelected ? "bg-gradient-to-r from-[#7a80fc]/90 to-[#bba7ee]/90 text-white font-bold border-l-4 border-[#7a80fc] shadow" : ""}
+                    hover:bg-[#ede9fe] hover:text-[#6f52e4] text-[#423e6d]
+                  `}
                   style={{
-                    paddingLeft: `${14 + depth * 14}px`,
-                    borderLeft: isOpen ? "2px solid #635bff" : "2px solid transparent",
+                    paddingLeft: `${14 + depth * 16}px`,
                   }}
                   onClick={() => {
                     toggleDir(fullPath);
@@ -351,9 +336,13 @@ export function SftpFileManager({ sftp }: { sftp?: SftpState }) {
               <li
                 key={fullPath}
                 onClick={e => toggleSelect(e, fullPath)}
-                className={`flex items-center rounded-sm cursor-pointer text-[15px] font-normal ${textClass}
-                hover:bg-[#25274a] hover:text-[#e6e8fe]`}
-                style={{ paddingLeft: `${35 + depth * 14}px` }}
+                className={`
+                  flex items-center rounded-lg cursor-pointer text-[15px] font-normal transition-all
+                  hover:bg-[#f7f6fa] hover:text-[#7068c4] text-[#6b6b87]
+                  ${isSelected ? "bg-gradient-to-r from-[#7a80fc]/90 to-[#bba7ee]/90 text-white font-bold border-l-4 border-[#7a80fc] shadow" : ""}
+                  ${textClass}
+                `}
+                style={{ paddingLeft: `${36 + depth * 16}px` }}
                 onDoubleClick={() => onEntryDoubleClick(entry)}
               >
                 {icon}
@@ -367,54 +356,55 @@ export function SftpFileManager({ sftp }: { sftp?: SftpState }) {
     );
   };
 
-
-
-
   return (
-    <div className="bg-[#22223c] rounded-lg min-h-[100%] shadow-none border-none text-white flex flex-col" onClick={e => toggleSelect(e, "none")}>
-      {/* 탭 헤더 */}
-      <div className="flex items-center h-9 border-b border-[#393c58] bg-[#22223c] px-2 gap-1 whitespace-nowrap min-w-0">
+    <div
+      className="
+        bg-white/70 shadow-xl rounded-2xl min-h-0 h-full flex flex-col
+        border border-[#e4e1f6] backdrop-bl-[2.5px] 
+        text-[#28294b]
+        w-full
+      "
+      onClick={e => toggleSelect(e, "none")}
+    >
+      <div className="flex items-center h-10 border-b border-[#ebe5f9] bg-gradient-to-r from-[#ede9fe] to-[#f3e8ff] px-2 gap-1 rounded-t-2xl min-w-0">
         <span
-          className={`px-3 h-9 flex items-center font-medium text-[15px] cursor-pointer border-b-2 border-transparent select-none
-          ${mode === "explorer" ? "text-[#ecebff] border-[#7a80fc]" : "text-[#aab1e2]"}
-        `}
+          className={`px-3 h-10 flex items-center font-semibold text-[15px] cursor-pointer border-b-2 border-transparent select-none
+            ${mode === "explorer" ? "text-[#7e4cff] border-[#7a80fc] bg-white/80 rounded-t-2xl" : "text-[#888eaf]"}
+          `}
           onClick={() => setMode("explorer")}
         >
           탐색기
         </span>
         <span
-          className={`px-3 h-9 flex items-center font-medium text-[15px] cursor-pointer border-b-2 border-transparent select-none
-          ${mode === "tree" ? "text-[#ecebff] border-[#7a80fc]" : "text-[#aab1e2]"}
-        `}
+          className={`px-3 h-10 flex items-center font-semibold text-[15px] cursor-pointer border-b-2 border-transparent select-none
+            ${mode === "tree" ? "text-[#7e4cff] border-[#7a80fc] bg-white/80 rounded-t-2xl" : "text-[#888eaf]"}
+          `}
           onClick={() => setMode("tree")}
         >
           트리
         </span>
         <span
-          className="px-2 h-9 flex items-center font-medium text-[15px] text-[#a6abdd] cursor-pointer select-none"
+          className="ml-auto px-2 h-10 flex items-center font-medium text-[15px] text-[#a6abdd] cursor-pointer select-none hover:text-[#7e4cff] transition"
           onClick={handleRefresh}
         >
-          <RefreshCcw size={13} className="mb-[-2px] mr-[2px]" />
+          <RefreshCcw size={15} className="mb-[-2px] mr-[2px]" />
           새로고침
         </span>
-
-
       </div>
       {mode === "explorer" && (
-      <div className="flex flex-col items-center justify-between px-4 py-2 bg-[#22223c] border-b border-[#393c58] gap-2">
-        <span className="pr-3 text-[14px] font-normal text-[#888eaf] truncate">
-          현재 폴더 경로: {cwd}
-        </span>
-        <span
-          className="w-full ml-2 px-3 py-1 rounded bg-[#7a80fc] text-white cursor-pointer text-[14px] font-semibold hover:bg-[#5560be]"
-          onClick={handleDownloadSelected}
-        >
-          다운로드
-        </span>
-      </div>
+        <div className="flex flex-col px-4 py-2 bg-white/60 border-b border-[#ebe5f9] gap-2">
+          <span className="pr-3 text-[14px] font-normal text-[#8e8ed9] truncate">
+            현재 폴더: <span className="font-semibold text-[#7e4cff]">{cwd}</span>
+          </span>
+          <button
+            className="w-full px-3 py-1 rounded-lg bg-gradient-to-r from-[#7a80fc] to-[#6e70f2] text-white font-semibold shadow-sm hover:from-[#b8a6ff] hover:to-[#6e70f2] transition"
+            onClick={handleDownloadSelected}
+          >
+            다운로드
+          </button>
+        </div>
       )}
-      {/* 본문 */}
-      <div className="flex-1 max-h-[600px] overflow-y-auto py-1">
+      <div className="flex-1 min-h-0 overflow-y-auto py-1 px-1">
         {mode === "explorer" && (
           <input
             type="text"
@@ -422,39 +412,38 @@ export function SftpFileManager({ sftp }: { sftp?: SftpState }) {
             id="sftp-search"
             onChange={e => setSearch(e.target.value)}
             placeholder="이 폴더에서 검색"
-            className="ml-3 w-40 bg-[#22223c] border border-[#353773] rounded px-3 py-1 text-[14px] text-[#c7cdfa] focus:outline-none focus:ring focus:ring-[#888ebd]/40 transition"
+            className="ml-3 w-40 bg-white border border-[#d5d2ea] rounded px-3 py-1 text-[14px] text-[#7a80fc] focus:outline-none focus:ring focus:ring-[#888ebd]/30 transition"
             style={{ minWidth: 90 }}
           />
         )}
         {mode === "tree" ? renderTree("/") : renderExplorer()}
       </div>
-      {/* 파일 열기 다이얼로그 */}
       {fileDialog && (
         <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50">
-          <div className="bg-[#22223c] rounded-xl shadow-xl px-8 py-6 flex flex-col items-center gap-3 min-w-[270px]">
-            <div className="text-lg font-semibold mb-2 text-[#ecebff]">
+          <div className="bg-white rounded-xl shadow-xl px-8 py-6 flex flex-col items-center gap-3 min-w-[270px] border border-[#ecebff]">
+            <div className="text-lg font-bold mb-2 text-[#7e4cff]">
               파일 열기 옵션
             </div>
-            <div className="text-[15px] text-[#9fa6c8] mb-3">
-              <span className="font-semibold text-[#d8deff]">{fileDialog?.file.name}</span>
+            <div className="text-[15px] text-[#6666a8] mb-3">
+              <span className="font-semibold text-[#7e4cff]">{fileDialog?.file.name}</span>
               <span> 을(를) 어떻게 열까요?</span>
             </div>
             <div className="flex gap-4">
               <button
-                className="px-5 py-1 rounded-lg bg-[#353773] text-white font-medium hover:bg-[#454b8a] transition"
+                className="px-5 py-1 rounded-lg bg-[#ecebff] text-[#7e4cff] font-medium hover:bg-[#bba7ee] transition"
                 onClick={() => handleOpenFile("vi")}
               >
                 vi로 열기
               </button>
               <button
-                className="px-5 py-1 rounded-lg bg-[#7a80fc] text-white font-medium hover:bg-[#5560be] transition"
+                className="px-5 py-1 rounded-lg bg-[#7a80fc] text-white font-medium hover:bg-[#6e70f2] transition"
                 onClick={() => handleOpenFile("vim")}
               >
                 vim으로 열기
               </button>
             </div>
             <button
-              className="mt-4 px-4 py-1 rounded text-[#abb2df] border border-[#353773] hover:bg-[#232347] transition"
+              className="mt-4 px-4 py-1 rounded text-[#7a80fc] border border-[#ecebff] hover:bg-[#ecebff] transition"
               onClick={() => setFileDialog(null)}
             >
               취소

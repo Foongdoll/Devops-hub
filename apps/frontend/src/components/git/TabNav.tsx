@@ -1,7 +1,9 @@
-import { Cloud, List, GitBranch, Inbox, History } from 'lucide-react';
+import { useState } from "react";
+import { Cloud, List, GitBranch, Inbox, History } from "lucide-react";
 import { showToast } from '../../utils/notifyStore';
 import type { Remote } from '../../customhook/git/useRemote';
 import { useRemoteContext } from '../../context/RemoteContext';
+import { motion } from "framer-motion";
 
 const tabs = [
   { key: 'remotes', icon: <Cloud />, label: 'Remotes' },
@@ -18,42 +20,81 @@ export interface TabNavProps {
   selectedRemote?: Remote | null;
 }
 
-const TabNav: React.FC<TabNavProps> = ({ active, onChange, children, selectedRemote }) => {
-  const { setSelectedRemote, changesCount } = useRemoteContext(); // ✅ changesCount 가져오기
+const iconVariants = {
+  initial: { rotate: 0, scale: 1 },
+  hover:   { rotate: 360, scale: 1.24, transition: { type: "spring", duration: 0.38 } }
+};
+
+const TabNav: React.FC<TabNavProps> = ({
+  active, onChange, children, selectedRemote
+}) => {
+  const { setSelectedRemote, changesCount } = useRemoteContext();
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
 
   return (
-    <nav className="flex items-center justify-between px-6 py-2 border-b border-gray-800 bg-gray-900">
-      {/* 왼쪽: 탭 목록 */}
-      <div className="flex gap-2">
-        {tabs.map(tab => (
-          <button
-            key={tab.key}
-            className={`flex items-center gap-1 px-3 py-2 rounded-xl transition 
-              ${active === tab.key ? 'bg-blue-900 text-blue-400 font-semibold' : 'text-gray-300 hover:bg-gray-800'}`}
-            onClick={() => {
-              if (selectedRemote) {
-                if (tab.key === 'remotes') setSelectedRemote(null);
-                onChange(tab.key as any);
-              } else {
-                showToast('먼저 리모트를 선택해주세요.', 'warn');
-              }
-            }}
-          >
-            <span className="w-5 h-5">{tab.icon}</span>
-            <span className="hidden md:inline">{tab.label}</span>
-
-            {/* ✅ Changes 탭이면 뱃지로 변경사항 수 표시 */}
-            {tab.key === 'changes' && changesCount > 0 && (
-              <span className="ml-1 inline-block bg-purple-700 text-white text-xs px-2 py-0.5 rounded-full">
-                {changesCount}
-              </span>
-            )}
-          </button>
-        ))}
+    <nav className="
+      flex items-center justify-between px-6 py-2
+      rounded-t-2xl shadow-md
+      bg-gradient-to-r from-[#ede9fe] via-[#e8defa] to-[#d1c4ff]
+      border-b border-[#e1dbfa]
+      select-none
+    ">
+      <div className="flex gap-1">
+        {tabs.map((tab, i) => {
+          const isActive = active === tab.key;
+          const isHover = hoverIdx === i;
+          return (
+            <button
+              key={tab.key}
+              className={`
+                flex items-center gap-1 px-4 py-2 rounded-xl font-medium relative
+                transition-all duration-150
+                ${isActive
+                  ? "bg-white shadow-lg text-[#7e4cff] scale-[1.08] font-extrabold ring-2 ring-[#7e4cff44] z-10"
+                  : "text-[#888ccf] hover:bg-[#f3e8ff] hover:shadow hover:text-[#7e4cff]"}
+              `}
+              style={{
+                boxShadow: isActive
+                  ? "0 2px 12px 0 #bba7ee40"
+                  : undefined,
+                outline: "none",
+                border: "none",
+              }}
+              onClick={() => {
+                if (selectedRemote) {
+                  if (tab.key === 'remotes') setSelectedRemote(null);
+                  onChange(tab.key as any);
+                } else {
+                  showToast('먼저 리모트를 선택해주세요.', 'warn');
+                }
+              }}
+              onMouseEnter={() => setHoverIdx(i)}
+              onMouseLeave={() => setHoverIdx(null)}
+            >
+              <motion.span
+                className="w-5 h-5 flex items-center justify-center"
+                variants={iconVariants}
+                animate={isActive || isHover ? "hover" : "initial"}
+              >
+                {tab.icon}
+              </motion.span>
+              <span className="hidden md:inline">{tab.label}</span>
+              {tab.key === 'changes' && changesCount > 0 && (
+                <span className="
+                  ml-1 inline-block
+                  bg-gradient-to-r from-[#7e4cff] to-[#bba7ee]
+                  text-white text-[11px] font-bold px-2 py-0.5
+                  rounded-full shadow
+                  animate-bounce
+                ">
+                  {changesCount}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
-
-      {/* 오른쪽: 액션 버튼 */}
-      <div className="flex gap-2">{children}</div>
+      <div className="flex gap-2 items-center">{children}</div>
     </nav>
   );
 };

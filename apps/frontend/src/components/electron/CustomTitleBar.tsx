@@ -22,8 +22,12 @@ const CustomTitleBar = () => {
     <div
       className="select-none flex items-center justify-between px-4 h-10"
       style={{
-        WebkitAppRegion: "drag", // Electron 드래그 가능
+        WebkitAppRegion: "drag",
         background: "linear-gradient(90deg, #7c3aed 0%, #a78bfa 50%, #8b5cf6 100%)",
+        zIndex: 10000, // 추가!
+        position: "fixed", // 추가!
+        top: 0, left: 0, right: 0,
+        width: "100%",
       }}
     >
       {/* 좌측 앱 이름/로고 */}

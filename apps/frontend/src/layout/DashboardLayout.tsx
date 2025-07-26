@@ -5,17 +5,24 @@ import TopBar from './TopBar';
 
 const DashboardLayout: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  
+
   return (
-    <div className="flex h-[calc(100vh-40px)] bg-[#3f2256]">
-      {/* Sidebar */}
+    <div
+      className="flex"
+      style={{
+        position: "relative",
+        top: 40, // 타이틀바 높이만큼 내림!
+        height: 'calc(100vh - 40px)',
+        minHeight: 0
+      }}
+    >
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       {/* Main: TopBar + Outlet */}
       <div className="flex-1 flex flex-col bg-white overflow-y-hidden">
         <TopBar onToggleSidebar={() => setSidebarOpen(o => !o)} />
-        <div className="flex-1 overflow-y-auto p-1 border-l border-gray-200">
-          <Outlet />  {/* 이 자리에서만 렌더링 */}
+        <div className="flex-1 overflow-y-hidden h-fit p-2 border-l border-[0.5px] border-gray-100">
+          <Outlet />
         </div>
       </div>
     </div>

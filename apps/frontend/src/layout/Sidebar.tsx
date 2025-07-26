@@ -1,8 +1,6 @@
-// src/layout/Sidebar.tsx
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
-  Menu as MenuIcon,
   X as CloseIcon,
   Home,
   Server,
@@ -12,6 +10,7 @@ import {
   Settings,
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeProvider';
+import { motion } from 'framer-motion';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -30,63 +29,101 @@ const mainMenus = [
 const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const { pathname } = useLocation();
   const { theme, toggleTheme } = useTheme();
+
   return (
     <>
       {/* 모바일 오버레이 */}
       {isOpen && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 0.45 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 bg-black bg-opacity-40 z-40 lg:hidden"
           onClick={onClose}
         />
       )}
 
-      {/* 사이드바 */}
-      <aside
+      <motion.aside
+        initial={{ x: -80, opacity: 0 }}
+        animate={{ x: 0, opacity: 1 }}
+        exit={{ x: -80, opacity: 0 }}
+        transition={{ type: 'spring', stiffness: 70, damping: 18 }}
         className={`
-          fixed inset-y-0 left-0 z-50 w-64 bg-[#322446] text-white
+          fixed left-0 z-50 w-64 
+          bg-gradient-to-br from-[#ede9fe] via-[#e9d5ff] to-[#e0c3fc] text-[#6d28d9]
+          shadow-xl ring-1 ring-[#d1c4ff77]
           transform transition-transform duration-200
           ${isOpen ? 'translate-x-0' : '-translate-x-full'}
           lg:translate-x-0 lg:static lg:block
         `}
+        style={{
+          top: 40,
+          height: 'calc(100vh - 40px)',
+          borderRight: '1.5px solid #c7a3fa44',
+          boxShadow: '0 6px 36px 0 #b794f466'
+        }}
       >
         {/* 모바일용 닫기 버튼 */}
         <div className="lg:hidden flex justify-end p-2">
-          <button onClick={onClose}>
-            <CloseIcon className="w-6 h-6 text-white" />
-          </button>
+          <motion.button
+            whileHover={{ scale: 1.2, backgroundColor: "#e0c3fc" }}
+            whileTap={{ scale: 0.9 }}
+            onClick={onClose}
+          >
+            <CloseIcon className="w-6 h-6 text-[#7e4cff]" />
+          </motion.button>
         </div>
 
         {/* 로고/헤더 */}
-        <div className="px-6 py-4 flex items-center border-b border-[#4d335d]">
-          <span className="w-15 h-15 rounded-full mr-2 flex items-center justify-center text-[2rem] bg-[#e8e5fd] border border-[#b9b3e3] shadow">
+        <motion.div
+          initial={{ y: -14, opacity: 0.6 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ type: "spring", stiffness: 180, damping: 14, delay: 0.13 }}
+          className="px-6 py-4 flex items-center border-b border-[#c7a3fa66]"
+        >
+          <span className="w-15 h-15 rounded-full mr-2 flex items-center justify-center text-[2rem] bg-[#ede9fe] border border-[#b9b3e3] shadow">
             🛠️
           </span>
-          <span className="font-bold text-xl">DevOps Hub</span>          
-        </div>
+          <span className="font-bold text-xl tracking-wide text-[#7e4cff]">DevOps Hub</span>
+        </motion.div>
 
         {/* 메뉴 리스트 */}
         <nav className="mt-4 space-y-1 px-2">
           {mainMenus.map(({ icon, label, path }) => {
             const active = pathname === path;
             return (
-              <Link
+              <motion.div
                 key={path}
-                to={path}
-                onClick={onClose}
-                className={`
-                  flex items-center px-4 py-2 rounded-l-full font-medium transition
-                  ${active
-                    ? 'bg-white text-[#7e4cff]'
-                    : 'text-gray-200 hover:bg-[#5b3f7d]'}
-                `}
+                whileHover={{
+                  scale: 1.03,
+                  x: 8,
+                  backgroundColor: "#f6f1fe",
+                  boxShadow: "0 2px 18px #b3c1f744"
+                }}
+                transition={{ type: "spring", stiffness: 140, damping: 12 }}
               >
-                <span className="w-5 h-5 mr-2">{icon}</span>
-                {label}
-              </Link>
+                <Link
+                  to={path}
+                  onClick={onClose}
+                  className={`
+                    flex items-center px-4 py-2 rounded-l-full font-semibold transition
+                    ${active
+                      ? 'bg-white text-[#7e4cff] shadow'
+                      : 'text-[#7c3aed] hover:bg-[#f3e8ff]'}
+                  `}
+                  style={{
+                    fontWeight: 600,
+                    letterSpacing: "0.04em"
+                  }}
+                >
+                  <span className="w-5 h-5 mr-2">{icon}</span>
+                  {label}
+                </Link>
+              </motion.div>
             );
           })}
         </nav>
-      </aside>
+      </motion.aside>
     </>
   );
 };

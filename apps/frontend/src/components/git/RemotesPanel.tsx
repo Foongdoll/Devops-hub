@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Pencil, Trash2, Plus, FolderOpen } from 'lucide-react';
 import { showToast } from '../../utils/notifyStore';
 import type { Remote } from '../../customhook/git/useRemote';
 import type { tabType } from '../../customhook/useGitManager';
 import { useRemoteContext } from '../../context/RemoteContext';
+import { motion } from "framer-motion";
 
 export interface RemotesPanelProps {
   remotes: Remote[];
@@ -15,22 +16,20 @@ export interface RemotesPanelProps {
   onBranchSelect: (remote: Remote) => Promise<boolean>;
 }
 
-const RemotesPanel: React.FC<RemotesPanelProps> = ({ remotes, onAdd, onEdit, onRemove, onChange, onSelect, onBranchSelect }) => {
-
+const RemotesPanel: React.FC<RemotesPanelProps> = ({
+  remotes, onAdd, onEdit, onRemove, onChange, onSelect, onBranchSelect
+}) => {
   const [showForm, setShowForm] = useState(false);
   const [editRemote, setEditRemote] = useState<Remote | null>(null);
   const [form, setForm] = useState<Remote>({ id: '', name: '', url: '', path: '' });
-  
-  // 폴더 선택 다이얼로그 (웹 환경에선 input[file webkitdirectory], 데스크탑/Electron에선 dialog 연동)
-  const handleBrowseFolder = async () => {
-    // 웹은 브라우저 제한이 많으므로 아래는 샘플(실제 Electron에선 dialog 호출)
-    // const folder = await window.api.selectFolder();
-    // setForm(f => ({ ...f, localPath: folder }));
-    // 데모용
+  const [clicked, setClicked] = useState<string | null>(null);
 
+  // 폴더 선택 (웹에서는 제한 있음)
+  const handleBrowseFolder = async () => {
     showToast('보안상 폴더 선택 기능은 웹에서는 지원하지 않습니다.\nElectron에서만 동작합니다.', 'warn');
   };
 
+  // 추가/수정
   const handleSubmit = () => {
     if (!form.name.trim() || !form.url.trim() || !form.path.trim()) return;
     if (editRemote) {
@@ -42,14 +41,27 @@ const RemotesPanel: React.FC<RemotesPanelProps> = ({ remotes, onAdd, onEdit, onR
     setEditRemote(null);
     setForm({ id: '', name: '', url: '', path: '' });
   };
-  
+
+  // 카드 클릭 시 팡! 애니메이션 + 선택 동작
+  const handleCardClick = async (r: Remote) => {
+    setClicked(r.id); // 팡!
+    const selected = await onSelect(r);
+    if (selected) {
+      const result = await onBranchSelect(r);
+      if (result) onChange('history');
+    }
+    setTimeout(() => setClicked(null), 280); // scale 애니 끝나고 원상복구
+  };
+
   return (
     <section className="max-w-xl mx-auto py-6">
       <header className="flex justify-between items-center mb-4">
-        <h2 className="text-lg text-gray-100 font-bold">Remotes</h2>
+        <h2 className="text-2xl font-extrabold bg-gradient-to-r from-[#7e4cff] to-[#bba7ee] text-transparent bg-clip-text">
+          Remotes
+        </h2>
         <button
           onClick={() => { setShowForm(true); setEditRemote(null); setForm({ id: '', name: '', url: '', path: '' }) }}
-          className="flex items-center gap-1 px-3 py-1 bg-gray-800 hover:bg-gray-700 rounded-lg text-white transition"
+          className="flex items-center gap-1 px-3 py-1.5 bg-gradient-to-r from-[#a084ee] to-[#6e70f2] hover:from-[#bba7ee] hover:to-[#7e4cff] rounded-xl text-white font-bold shadow transition-all"
         >
           <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Add Remote</span>
         </button>
@@ -57,11 +69,11 @@ const RemotesPanel: React.FC<RemotesPanelProps> = ({ remotes, onAdd, onEdit, onR
 
       {/* 추가/수정 폼 */}
       {showForm && (
-        <div className="mb-4 rounded-xl bg-gray-800 p-4 flex flex-col gap-3 shadow">
+        <div className="mb-4 rounded-2xl bg-[#e8e5fd] p-6 flex flex-col gap-3 shadow-xl border border-[#d1c4ff]">
           <div className="flex flex-col gap-1">
-            <label className="text-sm text-gray-300 font-semibold">별명</label>
+            <label className="text-sm text-[#7e4cff] font-bold">별명</label>
             <input
-              className="px-3 py-2 rounded bg-gray-900 text-white focus:outline-none"
+              className="px-3 py-2 rounded-lg bg-white text-[#5a5799] border border-[#ecebff] focus:outline-none focus:ring-2 focus:ring-[#7e4cff]/20"
               placeholder="예: origin, dev, backup"
               value={form.name}
               onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
@@ -69,26 +81,26 @@ const RemotesPanel: React.FC<RemotesPanelProps> = ({ remotes, onAdd, onEdit, onR
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-sm text-gray-300 font-semibold">Git 저장소 URL</label>
+            <label className="text-sm text-[#7e4cff] font-bold">Git 저장소 URL</label>
             <input
-              className="px-3 py-2 rounded bg-gray-900 text-white focus:outline-none"
+              className="px-3 py-2 rounded-lg bg-white text-[#5a5799] border border-[#ecebff] focus:outline-none focus:ring-2 focus:ring-[#7e4cff]/20"
               placeholder="예: https://github.com/org/repo.git"
               value={form.url}
               onChange={e => setForm(f => ({ ...f, url: e.target.value }))}
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-sm text-gray-300 font-semibold">로컬 폴더 경로</label>
+            <label className="text-sm text-[#7e4cff] font-bold">로컬 폴더 경로</label>
             <div className="flex gap-2">
               <input
-                className="flex-1 px-3 py-2 rounded bg-gray-900 text-white focus:outline-none"
+                className="flex-1 px-3 py-2 rounded-lg bg-white text-[#5a5799] border border-[#ecebff] focus:outline-none"
                 placeholder="로컬 폴더 경로"
                 value={form.path}
                 onChange={e => setForm(f => ({ ...f, path: e.target.value }))}
               />
               <button
                 type="button"
-                className="flex items-center gap-1 px-2 py-2 rounded bg-gray-700 hover:bg-gray-600 text-white"
+                className="flex items-center gap-1 px-2 py-2 rounded-lg bg-gradient-to-r from-[#e0defc] to-[#bba7ee] text-[#6e70f2] font-bold shadow hover:from-[#ede9fe] hover:to-[#bba7ee] transition"
                 onClick={handleBrowseFolder}
                 title="폴더 선택"
               >
@@ -99,14 +111,14 @@ const RemotesPanel: React.FC<RemotesPanelProps> = ({ remotes, onAdd, onEdit, onR
           </div>
           <div className="flex gap-2 mt-2 justify-end">
             <button
-              className="px-3 py-1 rounded-lg bg-gray-700 hover:bg-gray-600 text-white"
+              className="px-3 py-1.5 rounded-lg bg-[#bba7ee] text-[#7e4cff] font-bold hover:bg-[#ede9fe] hover:text-[#7e4cff] transition"
               onClick={() => { setShowForm(false); setEditRemote(null); }}
               type="button"
             >
               취소
             </button>
             <button
-              className="px-3 py-1 rounded-lg bg-blue-700 hover:bg-blue-600 text-white font-bold disabled:opacity-50"
+              className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-[#7e4cff] to-[#6e70f2] text-white font-bold shadow hover:from-[#bba7ee] hover:to-[#6e70f2] transition disabled:opacity-50"
               onClick={handleSubmit}
               disabled={!form.name.trim() || !form.url.trim() || !form.path.trim()}
             >
@@ -116,45 +128,49 @@ const RemotesPanel: React.FC<RemotesPanelProps> = ({ remotes, onAdd, onEdit, onR
         </div>
       )}
 
-      <ul className="space-y-2">
+      <ul className="space-y-4">
         {remotes.map(r => (
-          <li key={r.id} className="flex items-center justify-between bg-gray-800 rounded-xl px-4 py-3 group transition shadow-sm cursor-pointer hover:bg-gray-700"
-            onClick={async () => {
-              const selected = await onSelect(r);
-              if (selected) {
-                const result = await onBranchSelect(r);
-                if (result) {
-                  onChange('history'); // 선택된 원격 저장소로 변경
-                }
-              }
+          <motion.li
+            key={r.id}
+            className="flex items-center justify-between bg-white/90 rounded-2xl px-6 py-4 group shadow-lg cursor-pointer border border-[#e0e0f5] transition-all"
+            whileHover={{
+              rotateZ: -6,
+              scale: 1.03,
+              boxShadow: "0 8px 32px 0 #7e4cff33",
+              transition: { type: "spring", stiffness: 220, damping: 16 }
             }}
+            whileTap={{
+              scale: 1.17,
+              transition: { type: "spring", stiffness: 340, damping: 16 }
+            }}
+            animate={clicked === r.id ? { scale: [1.17, 1], transition: { duration: 0.33 } } : {}}
+            onClick={() => handleCardClick(r)}
+            style={{ transition: "box-shadow 0.16s" }}
           >                            
             <div>
-              <div className="font-semibold text-gray-100">{r.name}</div>
-              <div className="text-gray-400 text-xs">{r.url}</div>
-              <div className="text-gray-400 text-xs">{r.path}</div>
+              <div className="font-extrabold text-[#6e70f2] text-lg flex items-center gap-1">
+                <span className="mr-1">{r.name}</span>
+              </div>
+              <div className="text-[#888ccf] text-xs font-mono">{r.url}</div>
+              <div className="text-[#a7a7c7] text-xs font-mono">{r.path}</div>
             </div>
-            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition">
-              {/* <button
-                onClick={() => {
-                  setShowForm(true);
-                  setEditRemote(r);
-                  setForm(r);
-                }}
-                className="p-2 rounded-full hover:bg-gray-700"
+            <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button
+                onClick={e => { e.stopPropagation(); setShowForm(true); setEditRemote(r); setForm(r); }}
+                className="p-2 rounded-full hover:bg-[#ede9fe] transition"
                 title="수정"
               >
-                <Pencil className="w-4 h-4 text-gray-300 hover:text-blue-400" />
-              </button> */}
+                <Pencil className="w-4 h-4 text-[#7e4cff] hover:text-[#a084ee]" />
+              </button>
               <button
-                onClick={() => onRemove(r)}
-                className="p-2 rounded-full hover:bg-gray-700"
+                onClick={e => { e.stopPropagation(); onRemove(r); }}
+                className="p-2 rounded-full hover:bg-[#fff2f6] transition"
                 title="삭제"
               >
-                <Trash2 className="w-4 h-4 text-gray-300 hover:text-red-400" />
+                <Trash2 className="w-4 h-4 text-rose-400 hover:text-red-500" />
               </button>
             </div>
-          </li>
+          </motion.li>
         ))}
       </ul>
     </section>

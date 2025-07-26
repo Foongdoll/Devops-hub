@@ -30,7 +30,7 @@ export function useChanges(initialUnstaged: File[] = [], initialStaged: File[] =
   // 파일 배열로 받고 서버에서 처리
   // 파일 스테이징/언스테이징
   const stageFile = useCallback((remote: Remote, files: File[]) => {
-    showLoading({ message: '파일 스테이징 중...' });
+    // showLoading({ message: '파일 스테이징 중...' });
     emit('git_stage_unstage_toggle', { remote, files: files, staged: true });
 
     // setUnstagedFiles(prev => prev.filter(f => f.path !== file.path));
@@ -39,7 +39,7 @@ export function useChanges(initialUnstaged: File[] = [], initialStaged: File[] =
   }, [selectedRemote]);
 
   const unstageFile = useCallback((remote: Remote, files: File[]) => {
-    showLoading({ message: '파일 언스테이징 중...' });
+    // showLoading({ message: '파일 언스테이징 중...' });
     emit('git_stage_unstage_toggle', { remote, files: files, staged: false });
     // setStagedFiles(prev => prev.filter(f => f.path !== file.path));
     // setUnstagedFiles(prev => [...prev, file]);
@@ -262,7 +262,7 @@ export function useChanges(initialUnstaged: File[] = [], initialStaged: File[] =
     });
 
     on('git_stage_unstage_toggle_response', (data: { success: boolean; message: string; files: File[]; staged: boolean }) => {
-      hideLoading();
+      // hideLoading();
 
       if (data.success && Array.isArray(data.files)) {
         showToast(data.message ?? '성공', 'success');
