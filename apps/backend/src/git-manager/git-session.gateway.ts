@@ -14,7 +14,7 @@ import { promisify } from 'util';
 import { exec, execFile } from 'child_process';
 import { promises as fs } from 'fs';
 import { JwtTokenService } from 'src/auth/jwt.service';
-import { Branch, fetch_commit_history } from 'src/common/type/git.interface';
+import { Branch, fetch_commit_history, File } from 'src/common/type/git.interface';
 import { Remote } from './entity/remote.entity';
 import { ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import path from 'path';
@@ -222,35 +222,64 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
     @ConnectedSocket() socket: Socket
   ) {
     try {
-      console.log(data);
       const { remote, discard } = data;
+      const resultFiles: File[] = [];
 
-      // Git 명령어 실행
-      const { stdout, stderr } = await execFileAsync("git", [
+      // 스테이지에 안올라간 파일 조회
+      const { stdout: unstagedStdout, stderr } = await execFileAsync("git", [
         "-C", remote.path,
-        "status",
-        "-s"
+        "diff",
+        "--name-status",
       ]);
-      this.logger.log(`Git status command executed: ${stdout}`);
-      // 변경된 파일 목록 파싱
-      const changedFiles = stdout.split('\n')
-        .filter(line => line.trim() !== '')
-        .map(line => {
-          let staged = false;
-          !line.startsWith(' ') && (staged = true)
 
-          if (line.startsWith('??')) {
-            return { status: '??', path: line.split(' ')[1], staged: false };
-          }
+      unstagedStdout.split("\n").forEach(line => {
+        if (line.trim() === '') return;
+        const status = line.split('\t')[0];
+        const name = line.split('\t')[1];
+        const path = line.split('\t')[1];
+        const staged = false;
 
-          const { status, path } = staged ? { status: line.split(' ')[0], path: line.split(' ')[2] } : { status: line.split(' ')[1], path: line.split(' ')[2] };
-          return { status: status, path: path, staged };
-        });
+        resultFiles.push({ name, status, path, staged });
+      })
 
-      // console.log(changedFiles);
-      socket.emit('fetch_changed_files_response', { changedFiles, discard });
+      const { stdout: stagedStdout } = await execFileAsync("git", [
+        "-C", remote.path,
+        "diff",
+        "--cached",
+        "--name-status",
+      ]);
+
+      stagedStdout.split("\n").forEach(line => {
+        if (line.trim() === '') return;
+        const status = line.split('\t')[0];
+        const name = line.split('\t')[1];
+        const path = line.split('\t')[1];
+        const staged = true;
+
+        resultFiles.push({ name, status, path, staged });
+      });
+
+      const { stdout: untrackedStdout } = await execFileAsync("git", [
+        "-C", remote.path,
+        "ls-files",
+        "--others",
+        "--exclude-standard",
+      ]);
+
+      untrackedStdout.split("\n").forEach(line => {
+        if (line.trim() === '') return;
+        const name = line;
+        const path = line;
+        const status = '??'; // Untracked files
+        const staged = false;
+
+        resultFiles.push({ name, status, path, staged });
+      });
+
+      socket.emit('fetch_changed_files_response', { resultFiles, discard });
+      socket.emit('fetch_stash_changed_files_response', { resultFiles, discard });
     } catch (error) {
-      this.logger.error(`Git diff command failed: 244line: ${error.message}`);
+      this.logger.error(`Git diff command failed: ${error.message}`);
       socket.emit('fetch_changed_files_response', []);
     }
   }
@@ -813,14 +842,11 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
     @ConnectedSocket() client: Socket,
   ) {
     try {
-      console.log(data.files);
       const { remote, files, newStash } = data;
       const f = files.map(e => e.path);
       const args = ["-C", remote.path, "stash", "push", "-m", "--", newStash.message, ...f];
 
       const { stdout } = await execFileAsync("git", args);
-      this.logger.log(stdout);
-
 
       client.emit('git_stash_push_response', { success: true, stash: newStash });
     } catch (e) {
@@ -828,6 +854,68 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
       client.emit('git_stash_push_response', {
         success: false,
         error: e?.message || 'stash 실패',
+      });
+    }
+  }
+
+  @SubscribeMessage('git_stage_unstage_toggle')
+  async handleStageUnstageToggle(
+    @MessageBody() data: { remote: Remote, files: File[], staged: boolean },
+    @ConnectedSocket() sock: Socket,
+  ) {
+    const { remote, files, staged } = data;
+
+    try {
+      const args = [
+        '-C',
+        remote.path,
+        'diff',
+        '--name-only',
+      ];
+
+      // staged가 true면 넘어온 파일을 stage에 올리는 것
+      // staged가 false면 넘어온 파일을 stage에서 제거하는 것
+      if (!staged) {
+        args.push('--cached'); // 스테이지된 파일만 확인
+      }
+
+      // 1. 스테이지 상태 확인
+      const { stdout: statusOut } = await execFileAsync('git', args);
+
+      const lines = statusOut.trim().split('\n');
+      const resultFiles: File[] = [];
+
+      // 상태에 맞는 파일 중 프론트에서 넘어온 파일이 있는지 확인 
+      // 있다면 추출
+      lines.forEach((line, index) => {
+        files.map(file => {
+          if (file.path === line) {
+            resultFiles.push(file);
+          }
+        });
+      });
+
+      // 확실히 있는 파일들을 stage/unstage 처리
+      for (const file of resultFiles) {
+        if (!staged) {
+          await execFileAsync('git', ['-C', remote.path, 'reset', 'HEAD', '--', file.path]);
+        } else {
+          await execFileAsync('git', ['-C', remote.path, 'add', '--', file.path]);
+        }
+      }
+
+      // 4. 성공 응답
+      sock.emit('git_stage_unstage_toggle_response', {
+        success: true,
+        message: staged ? '파일이 스테이지에 추가되었습니다.' : '파일이 스테이지에서 제거되었습니다.',
+        files,
+        staged: staged,
+      });
+    } catch (error: any) {
+      sock.emit('git_stage_unstage_toggle_response', {
+        success: false,
+        message: error?.message ?? 'Stage/Unstage toggle failed',
+        files,
       });
     }
   }

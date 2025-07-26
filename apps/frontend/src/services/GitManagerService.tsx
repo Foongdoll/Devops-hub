@@ -2,6 +2,7 @@ import { io, Socket } from "socket.io-client";
 import { apiRequest } from "../axios/axiosInstance";
 import type { Remote } from "../customhook/git/useRemote";
 import type { Branch, TrackingBranch } from "../customhook/git/useBranches";
+import type { Stash } from "../customhook/git/useStash";
 
 // Remote Fetch
 export async function fetchRemotesImpl(): Promise<Remote[]> {
@@ -46,6 +47,32 @@ export async function fetchBranchesImpl(remote: Remote): Promise<{ local: Branch
   });
 }
 
+// 스테시 목록 가져오기
+export async function fetchStashsImpl(remote: Remote): Promise<Stash[]> {
+  return apiRequest<Stash[]>({
+    url: 'git-manager/fetchStashs',
+    method: 'POST',
+    data: { remote }
+  });
+}
+
+// 스테시 적용
+export async function applyStashImpl(remote: Remote, stashName: string): Promise<any> {
+  return apiRequest<void>({
+    url: 'git-manager/applyStash',
+    method: 'POST',
+    data: { remote, stashName }
+  });
+}
+
+// 스테시 삭제
+export async function dropStashImpl(remote: Remote, stashName: string): Promise<any> {
+  return apiRequest<void>({
+    url: 'git-manager/dropStash',
+    method: 'POST',
+    data: { remote, stashName }
+  });
+}
 
 class GitService {
   private socket: Socket | null = null;

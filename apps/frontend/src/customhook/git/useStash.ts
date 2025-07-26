@@ -2,7 +2,9 @@ import { useState, useCallback, useEffect } from 'react';
 import type { File } from './useChanges';
 import type { Remote } from './useRemote';
 import { useGitSocket } from '../../context/GitSocketContext';
-import { showToast } from '../../utils/notifyStore';
+import { hideLoading, showLoading, showToast } from '../../utils/notifyStore';
+import { applyStashImpl, dropStashImpl, fetchStashsImpl } from '../../services/GitManagerService';
+import { delay } from '../../utils/comm';
 export type Stash = { name: string; message: string; files: File[] };
 
 export function useStash(initial: Stash[] = []) {
@@ -18,18 +20,38 @@ export function useStash(initial: Stash[] = []) {
   const { emit, on, off } = useGitSocket();
 
 
-  const applyStash = useCallback((stash: Stash) => {
-    setStashes(prev => prev.filter(s => s.name !== stash.name));
-    setSelectedStash(null); setStashFiles([]); setSelectedStashFile(null); setStashDiff('');
-  }, []);
-  const dropStash = useCallback((stash: Stash) => {
-    setStashes(prev => prev.filter(s => s.name !== stash.name));
-    if (selectedStash?.name === stash.name) {
+  const applyStash = useCallback(async (remote: Remote, stash: Stash) => {
+    if (!remote || !stash) return;
+    showLoading({ message: "스태시 적용 중..." });
+    const res = await applyStashImpl(remote, stash.name);
+    if (res) {      
+      setStashes(prev => prev.filter(s => s.name !== stash.name));
       setSelectedStash(null); setStashFiles([]); setSelectedStashFile(null); setStashDiff('');
+    } 
+    await delay(1000);
+    hideLoading();
+  }, []);
+  const dropStash = useCallback(async (remote: Remote, stash: Stash) => {
+    if (!remote || !stash) return;
+    showLoading({ message: "스태시 적용 중..." });
+    const res = await dropStashImpl(remote, stash.name);
+    if (res) {      
+      setStashes(prev => prev.filter(s => s.name !== stash.name));
+      if (selectedStash?.name === stash.name) {
+        setSelectedStash(null); setStashFiles([]); setSelectedStashFile(null); setStashDiff('');
+      }
+    } else {
+      showToast('스태시 삭제 실패', 'error');
     }
+
+    await delay(1000);
+    hideLoading();
   }, [selectedStash]);
   const selectStash = useCallback((stash: Stash) => {
-    setSelectedStash(stash); setStashFiles(stash.files); setSelectedStashFile(null); setStashDiff('');
+    setSelectedStash(stash);
+    setStashFiles(stash.files);
+    setSelectedStashFile(null);
+    setStashDiff('');
   }, []);
   const selectStashFile = useCallback((file: File) => {
     setSelectedStashFile(file);
@@ -50,32 +72,41 @@ export function useStash(initial: Stash[] = []) {
   }, []);
 
 
-  const fetchStashChanges = useCallback((remote: Remote) => {
+  const fetchStashChangeFiles = useCallback((remote: Remote) => {
     emit('fetch_changed_files', { remote: remote });
+  }, []);
+  const fetchStashs = useCallback((remote: Remote) => {
+    fetchStashsImpl(remote).then(data => {
+      // console.log('fetchStashsImpl', data);
+      setStashes(data);
+    });
   }, []);
 
   useEffect(() => {
 
     // 변경 파일 리스트 조회
-    on('fetch_changed_files_response', (data: { changedFiles: { status: string; path: string, staged: boolean }[], discard?: boolean }) => {
-      if (data) {
-        const res = data.changedFiles.map(({ status, path, staged }) => ({ status, path, name: path, staged }) as File);
+    on('fetch_stash_changed_files_response', (data: { resultFiles: File[], discard?: boolean }) => {      
+      if (data.resultFiles) {
+        const res = data.resultFiles.filter(v => !v.staged);
         setStashChangedFiles(res);
       }
     });
+    return () => {
+      off('fetch_stash_changed_files_response');
+    }
   }, [])
 
   // 변경 파일을 Stash에 추가 (새 Stash 생성)
-  const createStash = useCallback((remote: Remote, files: File[], message: string) => {
+  const createStash = useCallback((remote: Remote | null, files: File[], message: string) => {
     if (files.length === 0) {
       showToast('임시 저장할 파일이 없습니다.\n파일을 선택해주세요.', 'info');
       return;
     }
-    
+
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const newStash: Stash = {
       name: `stash@{${stashes.length}}`,
-      message: message || `Stash from ${remote.name} - ${timestamp}`,
+      message: message || `Stash from ${remote?.name} - ${timestamp}`,
       files,
     };
 
@@ -90,21 +121,19 @@ export function useStash(initial: Stash[] = []) {
   }, [stashes]);
 
 
-  const fetchStashFileDiff = useCallback((file: File) => {
-    // 실제로는 socket emit 등으로 diff를 받아올 수도 있음
-    // 임시로 file.path와 stash.name 기반의 예시
+  const fetchStashFileDiff = useCallback((remote: Remote | null, selectedStash: Stash | null, file: File) => {
+
     if (selectedStash) {
-      // 서버/소켓 연동 시 emit('fetch_stash_diff', { stash: selectedStash.name, filePath: file.path })
-      setStashDiff(`// ${selectedStash.name}의 파일 diff 예시: ${file.name}\n(diff 내용 출력 위치)`);
+      emit('fetch_file_diff', { remote, filePath: file.path, fileStaged: false })
     }
     setSelectedStashFile(file);
   }, [selectedStash]);
 
 
-
-
-  const onStashFileSelect = useCallback((file: File) => {
-
+  // 스태시 안의 파일 선택 -> diff를 보여주는 함수
+  const onStashFileSelect = useCallback((remote: Remote | null, selectedStash: Stash | null, file: File) => {
+    setSelectedStashFile(file);
+    fetchStashFileDiff(remote, selectedStash, file);
   }, []);
 
 
@@ -112,17 +141,21 @@ export function useStash(initial: Stash[] = []) {
     const handleStashPushResponse = (data: { success: boolean; stash: Stash; error?: string }) => {
       if (data.success && data.stash) {
         setStashes(prev => [data.stash, ...prev]);
-        setStashChangedFiles([]); // 변경 파일 목록 비움 (선택사항)
-        setStashes(prev => [data.stash!, ...prev]);
+        setStashChangedFiles([]); // 변경 파일 목록 비움 (선택사항) 
       } else if (!data.success) {
-        // 실패시 알림/롤백 등
+        // 실패시 알림/롤백 등 
         showToast('임시저장 에러 : ' + data.error, 'error')
       }
     };
 
+    on('fetch_file_diff_response', (diff: string) => {
+      setStashDiff(diff);
+    });
+
     on('git_stash_push_response', handleStashPushResponse);
     return () => {
       off('git_stash_push_response', handleStashPushResponse);
+      off('fetch_file_diff_response');
     };
   }, [on, off]);
 
@@ -142,7 +175,7 @@ export function useStash(initial: Stash[] = []) {
     applyStash, dropStash, selectStash, selectStashFile,
     setStashes,
     onCheckoutConflictFilesStash,
-    fetchStashChanges,
+    fetchStashChangeFiles,
     stashChangedFiles, setStashChangedFiles,
     // 추가
     createStash,
@@ -151,6 +184,8 @@ export function useStash(initial: Stash[] = []) {
     onStashFileSelect,
 
     selectedChangedFiles, setSelectedChangedFiles,
-    stashMessage, setStashMessage
+    stashMessage, setStashMessage,
+
+    fetchStashs
   };
 }

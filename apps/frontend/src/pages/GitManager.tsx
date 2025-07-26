@@ -56,7 +56,9 @@ const GitManager = () => {
         {git.tab === "changes" && (
           <ChangesPanel
             unstagedFiles={git.unstagedFiles}
+            setUnstagedFiles={git.setUnstagedFiles}            
             stagedFiles={git.stagedFiles}
+            setStagedFiles={git.setStagedFiles}
             onStage={git.stageFile}
             onUnstage={git.unstageFile}
             onSelectFile={git.selectFile}
@@ -95,13 +97,14 @@ const GitManager = () => {
             onStashFileSelect={git.onStashFileSelect}
             selectedStashFile={git.selectedStashFile}
             diff={git.stashDiff}            
-            onFetchStashChanges={git.fetchStashChanges}            
+            onFetchStashChangeFiles={git.fetchStashChangeFiles}            
             stashChangedFiles={git.stashChangedFiles}
             setStashChangedFiles={git.setStashChangedFiles}
             selectedChangedFiles={git.selectedChangedFiles}           
             setSelectedChangedFiles={git.setSelectedChangedFiles}     
             setStashMessage={git.setStashMessage}
-            stashMessage={git.stashMessage}              
+            stashMessage={git.stashMessage}    
+            onFetchStashs={git.fetchStashs}
           />
         )}
         <ConflictModal

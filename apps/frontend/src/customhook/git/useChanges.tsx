@@ -17,7 +17,7 @@ export function useChanges(initialUnstaged: File[] = [], initialStaged: File[] =
   const [left, setLeft] = useState<string>('');
   const [right, setRight] = useState<string>('');
 
-  const { selectedRemoteBranch, selectedRemote, remoteBranches, setConflictModalOpen } = useRemoteContext();
+  const { selectedRemoteBranch, selectedRemote, setConflictModalOpen } = useRemoteContext();
   const { emit, on, off } = useGitSocket();
 
   // 선택된 줄 번호 관리 (변경 사항에서)
@@ -25,16 +25,25 @@ export function useChanges(initialUnstaged: File[] = [], initialStaged: File[] =
 
   const [socketResponse, setSocketResponse] = useState<boolean>(false);
 
+
+
+  // 파일 배열로 받고 서버에서 처리
   // 파일 스테이징/언스테이징
-  const stageFile = useCallback((file: File) => {
-    setUnstagedFiles(prev => prev.filter(f => f.path !== file.path));
-    setStagedFiles(prev => [...prev, file]);
-    setSelectedFile(file);
+  const stageFile = useCallback((remote: Remote, files: File[]) => {
+    showLoading({ message: '파일 스테이징 중...' });
+    emit('git_stage_unstage_toggle', { remote, files: files, staged: true });
+
+    // setUnstagedFiles(prev => prev.filter(f => f.path !== file.path));
+    // setStagedFiles(prev => [...prev, file]);
+    // setSelectedFile(file);
   }, [selectedRemote]);
-  const unstageFile = useCallback((file: File) => {
-    setStagedFiles(prev => prev.filter(f => f.path !== file.path));
-    setUnstagedFiles(prev => [...prev, file]);
-    setSelectedFile(file);
+
+  const unstageFile = useCallback((remote: Remote, files: File[]) => {
+    showLoading({ message: '파일 언스테이징 중...' });
+    emit('git_stage_unstage_toggle', { remote, files: files, staged: false });
+    // setStagedFiles(prev => prev.filter(f => f.path !== file.path));
+    // setUnstagedFiles(prev => [...prev, file]);
+    // setSelectedFile(file);
   }, [selectedRemote]);
 
   // 파일 선택 (ChangePanel)
@@ -117,21 +126,24 @@ export function useChanges(initialUnstaged: File[] = [], initialStaged: File[] =
 
   useEffect(() => {
     // 변경 파일 리스트 조회
-    on('fetch_changed_files_response', (data: { changedFiles: { status: string; path: string, staged: boolean }[], discard?: boolean }) => {
-      if (data) {
+    on('fetch_changed_files_response', (data: { resultFiles: File[], discard?: boolean }) => {
+      if (data.resultFiles) {
+        console.log(data.resultFiles);
         const staged: File[] = [];
         const unstaged: File[] = [];
-        data.changedFiles.forEach(({ status, path, staged: isStaged }) => {
-          const file = { status, path, name: path, staged: isStaged } as File;
-          if (!file.path) return;
-          if (isStaged) staged.push(file);
-          else unstaged.push(file);
+        data.resultFiles.forEach(file => {
+          if (file.staged) {
+            staged.push(file);
+          } else {
+            unstaged.push(file);
+          }
         });
+
 
         setStagedFiles(staged);
         setUnstagedFiles(unstaged);
 
-        emit('fetch_change_count', { remote:selectedRemote });
+        emit('fetch_change_count', { remote: selectedRemote });
         if (!data.discard) {
           setFileDiff('');
         }
@@ -251,6 +263,39 @@ export function useChanges(initialUnstaged: File[] = [], initialStaged: File[] =
       }
     });
 
+    on('git_stage_unstage_toggle_response', (data: { success: boolean; message: string; files: File[]; staged: boolean }) => {
+      hideLoading();
+
+      if (data.success && Array.isArray(data.files)) {
+        showToast(data.message ?? '성공', 'success');
+        setSocketResponse(true);
+
+        if (data.staged) {
+          setStagedFiles(prev => {
+            const newFiles = data.files.filter(f => f.path);
+            // 중복 제거 (path 기준)
+            const existingPaths = new Set(prev.map(f => f.path));
+            const filteredNewFiles = newFiles.filter(f => !existingPaths.has(f.path));
+            return [...prev, ...filteredNewFiles];
+          });
+
+          setUnstagedFiles(prev => prev.filter(f => !data.files.some(df => df.path === f.path)));
+        } else {
+          setUnstagedFiles(prev => {
+            const newFiles = data.files.filter(f => f.path);
+            const existingPaths = new Set(prev.map(f => f.path));
+            const filteredNewFiles = newFiles.filter(f => !existingPaths.has(f.path));
+            return [...prev, ...filteredNewFiles];
+          });
+
+          setStagedFiles(prev => prev.filter(f => !data.files.some(df => df.path === f.path)));
+        }
+      } else {
+        showToast(`파일 스테이지/언스테이지 실패: ${data.message || '알 수 없는 오류'}`, 'error');
+        setSocketResponse(false);
+      }
+    });
+
 
 
 
@@ -258,6 +303,11 @@ export function useChanges(initialUnstaged: File[] = [], initialStaged: File[] =
       off('fetch_changed_files_response');
       off('fetch_file_diff_response');
       off('fetch_conflict_file_diff_response');
+      off('git_commit_response');
+      off('checkout_remote_branch_response');
+      off('discard_file_response');
+      off('discard_all_response');
+      off('discard_lines_response');
     }
   }, [selectedRemote])
 

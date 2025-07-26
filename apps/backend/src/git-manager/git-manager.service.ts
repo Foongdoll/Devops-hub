@@ -3,12 +3,13 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Remote, UserRemoteJoin } from './entity/remote.entity';
 import { In, Repository } from 'typeorm';
 import { ApiResponse } from 'src/common/dto/response.dto';
-import { exec, execFile } from 'child_process';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 import * as fs from 'fs';
 import { UserType } from 'src/common/decorator/user.decorator';
 import { AddRemoteDto } from './dto/addRemote.dto';
-import {v4 as uuid} from 'uuid';
+import { v4 as uuid } from 'uuid';
+import { File, Stash } from 'src/common/type/git.interface';
 const execFileAsync = promisify(execFile);
 
 @Injectable()
@@ -41,12 +42,12 @@ export class GitManagerService {
       remoteEntity.name = remote.name;
       remoteEntity.url = remote.url;
       remoteEntity.path = remote.path.replace(/\\/g, '/');
-            
+
       const userRemoteJoinEntity = this.userRemoteJoinRepository.create({
         userCd: user.sub,
         remoteId: remoteEntity.id
       });
-      
+
       // 경로가 존재하지 않으면 디렉토리 생성
       if (!isGit) {
         // Git 초기화 및 원격 저장소 추가
@@ -164,5 +165,55 @@ export class GitManagerService {
     }
   }
 
+  async fetchStashs(remote: Remote): Promise<ApiResponse> {
+    try {
+      const { stdout, stderr } = await execFileAsync('git', ['-C', remote.path, 'stash', 'list']);
+      const lines = stdout.split('\n').filter(line => line.trim() !== '');
 
+      const result = await Promise.all(
+        lines.map(async (line) => {
+          const name = line.split(':')[0];
+          const message = line.split(':')[1];
+
+          if (!name || !message) {
+            return null;
+          }
+
+          const { stdout: filesStr } = await execFileAsync('git', ['-C', remote.path, 'stash', 'show', '--name-only', name]);
+          const files = filesStr
+            .split('\n')
+            .filter(f => f.trim() !== '')
+            .map(f => ({ status: 'M', path: f, name: f, staged: false })) as File[];
+
+          return { name, message, files } as Stash;
+        })
+      );
+
+      return ApiResponse.success(result, '스태시 목록을 가져왔습니다.');
+    } catch (error) {
+      return ApiResponse.error('스태시 목록 조회에 실패했습니다.', { code: '500' });
+    }
+  }
+
+  async applyStash(remote: Remote, stashName: string): Promise<ApiResponse> {
+    try {
+      const { stdout, stderr } = await execFileAsync('git', ['-C', remote.path, 'stash', 'apply', stashName]);
+      this.logger.log(`스태시 적용 성공: ${stdout}`);
+      return ApiResponse.success(undefined, '스태시가 적용되었습니다.', { type: 'success' });
+    } catch (error) {
+      this.logger.error(`스태시 적용 중 오류 발생: ${error}`);
+      return ApiResponse.error('스태시 적용에 실패했습니다.', { type: 'error' });
+    }
+  }
+
+  async dropStash(remote: Remote, stashName: string): Promise<ApiResponse> {
+    try {
+      const { stdout, stderr } = await execFileAsync('git', ['-C', remote.path, 'stash', 'drop', stashName]);
+      this.logger.log(`스태시 삭제 성공: ${stdout}`);
+      return ApiResponse.success(undefined, '스태시가 삭제되었습니다.');  
+    } catch (error) {
+      this.logger.error(`스태시 삭제 중 오류 발생: ${error}`);
+      return ApiResponse.error('스태시 삭제에 실패했습니다.', { type: 'error' });
+    }
+  }
 }

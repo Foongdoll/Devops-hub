@@ -1,4 +1,4 @@
-import { FileText, FileQuestion, Plus, Minus } from 'lucide-react';
+import { FileText, FileQuestion, Plus, Minus, Repeat, } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { File } from '../../customhook/git/useChanges';
 import { useRemoteContext } from '../../context/RemoteContext';
@@ -10,9 +10,11 @@ import { useGitSocket } from '../../context/GitSocketContext';
 
 export interface ChangesPanelProps {
   unstagedFiles: File[];
+  setUnstagedFiles: (files: File[]) => void;
   stagedFiles: File[];
-  onStage: (file: File) => void;
-  onUnstage: (file: File) => void;
+  setStagedFiles: (files: File[]) => void;
+  onStage: (remote: Remote, files: File[]) => void;
+  onUnstage: (remote: Remote, files: File[]) => void;
   onSelectFile: (file: File, remote: Remote) => void;
   selectedFile: File | null;
   diff: string;
@@ -31,6 +33,7 @@ export interface ChangesPanelProps {
 
 const ChangesPanel: React.FC<ChangesPanelProps> = ({
   stagedFiles, unstagedFiles,
+  setStagedFiles, setUnstagedFiles,
   onStage, onUnstage,
   onSelectFile, selectedFile, diff,
   commitMsg, setCommitMsg,
@@ -60,9 +63,10 @@ const ChangesPanel: React.FC<ChangesPanelProps> = ({
     onSelectedLines([]);
   }, [selectedFile]);
 
-
-  console.log(diff);
-  console.log(selectedLines);
+  const onToggleStageFiles = (sw: boolean) => {
+    if (!selectedRemote) return;  
+    sw ? onStage(selectedRemote, unstagedFiles) : onUnstage(selectedRemote, stagedFiles);
+  }
 
   return (
     <section className="flex flex-col md:flex-row h-[calc(100vh-220px)] gap-6 px-6 py-6">
@@ -78,17 +82,38 @@ const ChangesPanel: React.FC<ChangesPanelProps> = ({
           selectedRemote={selectedRemote || { name: '', url: '' } as Remote}
         />
         <div className="bg-gray-800 rounded-lg shadow p-3 flex-1 flex flex-col overflow-y-auto">
-          <div className="font-semibold text-gray-300 mb-2">Staged Files ({stagedFiles.length})</div>
+          <div className="font-semibold text-gray-300 mb-2 justify-between flex items-center">
+            <span>Staged Files ({stagedFiles.length})</span>
+            <span>
+              <button onClick={() => onToggleStageFiles(false)}><Repeat /></button>
+            </span>
+          </div>
           <ul className="flex-1 space-y-1 overflow-y-auto">
             {stagedFiles.map(f => (
-              <li key={f.path} className="flex items-center justify-between bg-[#22173b] group rounded px-2 py-1 hover:bg-gray-700 transition cursor-pointer"
+              <li
+                key={f.path}
+                data-tooltip-id={`file-name-tooltip-${f.path}`}
+                data-tooltip-content={f.name}
+                className="flex h-[32px] items-center justify-between bg-[#22173b] group rounded-xl px-4 py-3 hover:bg-gray-700 transition shadow-sm cursor-pointer truncate"
                 onClick={() => selectedRemote && onSelectFile(f, selectedRemote)}
               >
-                <div className="flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-gray-400" />
-                  <span className="text-gray-200">{f.name}</span>
+                <div className="flex items-center gap-2 min-w-0">
+                  {f.status === "??" ? (
+                    <FileQuestion className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                  ) : (
+                    <FileText className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                  )}
+                  <span className="text-gray-200 max-w-[250px] truncate block">
+                    {f.name}
+                  </span>
+                  <Tooltip
+                    id={`file-name-tooltip-${f.path}`}
+                    place="top"
+                    style={{ zIndex: 9999, fontSize: 16, maxWidth: 600 }}
+                  />
                 </div>
-                <button onClick={e => { e.stopPropagation(); onUnstage(f); }}
+                <button
+                  onClick={e => { e.stopPropagation(); selectedRemote && onUnstage(selectedRemote, [f]); }}
                   className="p-1 rounded-full hover:bg-orange-900"
                   title="Unstage"
                 >
@@ -98,23 +123,32 @@ const ChangesPanel: React.FC<ChangesPanelProps> = ({
             ))}
           </ul>
         </div>
+
         <div className="bg-gray-800 rounded-lg shadow p-3 flex-1 flex flex-col overflow-y-auto">
-          <div className="font-semibold text-gray-300 mb-2">Unstaged Files ({unstagedFiles.length})</div>
-          <ul className="flex-1 space-y-1 ">
+          <div className="font-semibold text-gray-300 mb-2 justify-between flex items-center">
+            <span>
+              Unstaged Files ({unstagedFiles.length})
+            </span>
+            <span>
+              <button onClick={() => onToggleStageFiles(true)}><Repeat /></button>
+            </span>
+          </div>
+          <ul className="flex-1 space-y-1 overflow-y-auto">
             {unstagedFiles.map(f => (
-              <li key={f.path}
+              <li
+                key={f.path}
                 data-tooltip-id={`file-name-tooltip-${f.path}`}
                 data-tooltip-content={f.name}
-                className="flex items-center justify-between bg-[#22173b] rounded-xl px-4 py-3 group transition shadow-sm cursor-pointer hover:bg-gray-700"
+                className="flex h-[32px] items-center justify-between bg-[#22173b] group rounded-xl px-4 py-3 hover:bg-gray-700 transition shadow-sm cursor-pointer truncate"
                 onClick={() => selectedRemote && onSelectFile(f, selectedRemote)}
               >
-                <div className="flex items-center gap-2">
-                  {f.status === "??" ?
-                    (<FileQuestion className="w-4 h-4 text-gray-400" />) :
-                    (<FileText className="w-4 h-4 text-gray-400" />)}
-                  <span
-                    className="text-gray-200 max-w-[250px] truncate block"
-                  >
+                <div className="flex items-center gap-2 min-w-0">
+                  {f.status === "??" ? (
+                    <FileQuestion className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                  ) : (
+                    <FileText className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                  )}
+                  <span className="text-gray-200 max-w-[250px] truncate block">
                     {f.name}
                   </span>
                   <Tooltip
@@ -123,7 +157,8 @@ const ChangesPanel: React.FC<ChangesPanelProps> = ({
                     style={{ zIndex: 9999, fontSize: 16, maxWidth: 600 }}
                   />
                 </div>
-                <button onClick={e => { e.stopPropagation(); onStage(f); }}
+                <button
+                  onClick={e => { e.stopPropagation(); selectedRemote && onStage(selectedRemote, [f]); }}
                   className="p-1 rounded-full hover:bg-green-900"
                   title="Stage"
                 >
@@ -133,6 +168,7 @@ const ChangesPanel: React.FC<ChangesPanelProps> = ({
             ))}
           </ul>
         </div>
+
       </div>
       {/* Right: Diff viewer + Commit */}
       <div className="w-full md:w-2/3 flex flex-col h-full">
@@ -155,7 +191,7 @@ const ChangesPanel: React.FC<ChangesPanelProps> = ({
             disabled={!selectedFile || selectedLines.length === 0}
             onClick={() => {
               if (selectedFile && selectedLines.length > 0) {
-                onDiscard(selectedRemote || {} as Remote, selectedFile, selectedLines);                
+                onDiscard(selectedRemote || {} as Remote, selectedFile, selectedLines);
               }
             }}
           >
@@ -247,13 +283,13 @@ const ChangesPanel: React.FC<ChangesPanelProps> = ({
                       data-line-number={actualLineNumber ?? undefined}
                       data-index={index}
                       className={`flex items-center group border-b border-gray-700/60 ${bgClass} ${selectedLines.includes(actualLineNumber)
-                          ? 'ring-2 ring-purple-400 z-10'
-                          : ''
+                        ? 'ring-2 ring-purple-400 z-10'
+                        : ''
                         }`}
                     >
                       {/* 체크박스 */}
                       <span className="w-6 flex justify-center">
-                        {isSelectable && (
+                        {isSelectable && line.startsWith('+') && (
                           <input
                             type="checkbox"
                             checked={selectedLines.includes(actualLineNumber)}

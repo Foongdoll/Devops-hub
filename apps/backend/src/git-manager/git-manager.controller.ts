@@ -46,4 +46,20 @@ export class GitManagerController {
   async fetchBranches(@Body() { remote }: { remote: Remote }): Promise<ApiResponse> {
     return await this.gitManagerService.fetchBranches(remote);
   } 
+  
+  @Post('fetchStashs')
+  @ApiOperation({ summary: '스태시 목록 조회', description: '특정 원격 저장소의 스태시 목록을 조회합니다.', parameters: [] })
+  async fetchStashs(@Body() { remote }: { remote: Remote }): Promise<ApiResponse> {
+    return await this.gitManagerService.fetchStashs(remote);
+  }
+  
+  @Post('applyStash')
+  async applyStash(@Body() { remote, stashName }: { remote: Remote, stashName: string }): Promise<ApiResponse<void>> {
+    return await this.gitManagerService.applyStash(remote, stashName);
+  }
+  
+  @Post('dropStash')
+  async dropStash(@Body() { remote, stashName }: { remote: Remote, stashName: string }): Promise<ApiResponse<void>> {
+    return await this.gitManagerService.dropStash(remote, stashName);
+  }
 }

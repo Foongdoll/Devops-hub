@@ -1,4 +1,4 @@
-import { Archive, FileText, PackagePlus, Trash2 } from 'lucide-react';
+import { Archive, FileText, Minus, PackagePlus, Plus, Trash2 } from 'lucide-react';
 import type { File } from '../../customhook/git/useChanges';
 import type { Remote } from '../../customhook/git/useRemote';
 import { useEffect, useState } from 'react';
@@ -13,22 +13,23 @@ export interface Stash {
 
 export interface StashPanelProps {
   stashes: Stash[];
-  onApply: (stash: Stash) => void;
+  onApply: (remote: Remote, stash: Stash) => void;
   onCreate: (remote: Remote | null, files: File[], message: string) => void;
-  onDrop: (stash: Stash) => void;
+  onDrop: (remote: Remote, stash: Stash) => void;
   onSelect: (stash: Stash) => void;
   selectedStash: Stash | null;
   stashFiles: File[];
-  onStashFileSelect: (file: File) => void;
+  onStashFileSelect: (remote: Remote | null, stash: Stash | null, file: File) => void;
   selectedStashFile: File | null;
   diff: string;
-  onFetchStashChanges: (remote: Remote) => void;
+  onFetchStashChangeFiles: (remote: Remote) => void;
   stashChangedFiles: File[];
   setStashChangedFiles: (files: File[]) => void;
   selectedChangedFiles: File[]; // 여러개 선택
   setSelectedChangedFiles: (files: File[]) => void;
   stashMessage: string;
   setStashMessage: (msg: string) => void;
+  onFetchStashs: (remote: Remote) => void;
 }
 
 const StashPanel: React.FC<StashPanelProps> = ({
@@ -43,18 +44,23 @@ const StashPanel: React.FC<StashPanelProps> = ({
   selectedStashFile,
   diff,
   selectedChangedFiles,
-  onFetchStashChanges,
+  onFetchStashChangeFiles,
   stashChangedFiles,
   setStashChangedFiles,
   setSelectedChangedFiles,
   stashMessage, setStashMessage,
+  onFetchStashs
 }) => {
   const { selectedRemote } = useRemoteContext();
   const { emit } = useGitSocket();
+  
 
   useEffect(() => {
-    if (selectedRemote) onFetchStashChanges(selectedRemote);
-  }, [selectedRemote]);
+    if (selectedRemote) {
+      onFetchStashChangeFiles(selectedRemote);
+      onFetchStashs(selectedRemote);
+    }
+  }, []);
 
   // 멀티 선택 핸들러 (동일)
   const handleToggleChangedFile = (file: File) => {
@@ -66,6 +72,10 @@ const StashPanel: React.FC<StashPanelProps> = ({
     }
     // 필요하다면 외부 콜백도 호출
 
+  };
+  
+  if(!selectedRemote) {
+    return null;
   };
 
   return (
@@ -147,7 +157,7 @@ const StashPanel: React.FC<StashPanelProps> = ({
                   <button
                     onClick={e => {
                       e.stopPropagation();
-                      onApply(stash);
+                      onApply(selectedRemote, stash);
                     }}
                     title="Apply"
                     className="p-1 hover:bg-blue-800 rounded"
@@ -157,7 +167,7 @@ const StashPanel: React.FC<StashPanelProps> = ({
                   <button
                     onClick={e => {
                       e.stopPropagation();
-                      onDrop(stash);
+                      onDrop(selectedRemote, stash);
                     }}
                     title="Drop"
                     className="p-1 hover:bg-red-900 rounded"
@@ -172,15 +182,19 @@ const StashPanel: React.FC<StashPanelProps> = ({
         {/* stash 파일 목록 */}
         <div className="bg-gray-800 rounded-xl shadow p-3 flex-1 min-h-[180px]">
           <div className="text-sm text-gray-400 font-semibold mb-3">Files</div>
-          <ul className="space-y-1">
+          <ul className="space-y-1 overflow-y-auto max-h-[230px]">
             {stashFiles.map(f => (
               <li
                 key={f.path}
-                className={`flex items-center px-2 py-1 rounded hover:bg-gray-700 transition cursor-pointer
+                className={`flex 
+                items-center px-2 py-1 rounded 
+                hover:bg-gray-700 transition cursor-pointer
+                truncate
                   ${selectedStashFile && selectedStashFile.path === f.path
                     ? 'bg-blue-900 text-blue-400 font-bold'
                     : 'text-gray-200'}`}
-                onClick={() => onStashFileSelect(f)}
+                title={f.name}
+                onClick={() => onStashFileSelect(selectedRemote || null, selectedStash || null, f)}
               >
                 <FileText className="w-4 h-4 mr-2 text-gray-400" />
                 {f.name}
@@ -194,10 +208,111 @@ const StashPanel: React.FC<StashPanelProps> = ({
       <div className="w-1/2 bg-gray-900 rounded-xl shadow p-3 overflow-y-auto flex flex-col">
         <div className="text-sm text-gray-400 font-semibold mb-3">Diff Viewer</div>
         {diff ? (
-          <pre className="font-mono text-sm text-gray-100 flex-1">{diff}</pre>
+          <div className="font-mono text-sm text-gray-100 w-fit min-w-full">
+            {(() => {
+              let oldLineNum = 0;
+              let newLineNum = 0;
+
+              return diff.split('\n').flatMap((line, index) => {
+                // 1. diff 헤더 제거
+                if (
+                  line.startsWith('diff --git') ||
+                  line.startsWith('index') ||
+                  line.startsWith('--- ') ||
+                  line.startsWith('+++ ')
+                ) {
+                  return [];
+                }
+
+                // 2. hunk 시작 부분 → 줄 번호 초기화
+                if (line.startsWith('@@')) {
+                  const match = /@@ -(\d+),?\d* \+(\d+),?\d*/.exec(line);
+                  if (match) {
+                    oldLineNum = parseInt(match[1], 10);
+                    newLineNum = parseInt(match[2], 10);
+                  }
+
+                  const header = match ? line : `Hunk ${index}`;
+                  return (
+                    <div
+                      key={`hunk-${index}`}
+                      className="flex items-center font-bold bg-yellow-800/70 text-yellow-200 border-t border-b border-yellow-500/50 py-1"
+                    >
+                      <span className="w-6" />
+                      <span className="w-9 text-xs opacity-40" />
+                      <span className="w-9 text-xs opacity-40" />
+                      <span className="ml-2">{header}</span>
+                    </div>
+                  );
+                }
+
+                // 3. 본문 라인 상태 초기화
+                let displayOld: string | number = '';
+                let displayNew: string | number = '';
+                let bgClass = '';
+                let icon = null;
+                let textClass = '';
+                let isSelectable = false;
+                let actualLineNumber: number | null = null;
+
+                if (line.startsWith('+')) {
+                  displayOld = '';
+                  displayNew = newLineNum;
+                  actualLineNumber = newLineNum;
+                  newLineNum++;
+                  bgClass = 'bg-green-950 hover:bg-green-900';
+                  textClass = 'text-green-300';
+                  icon = <Plus size={16} className="inline-block text-green-400 mr-1" />;
+                  isSelectable = true;
+                } else if (line.startsWith('-')) {
+                  displayOld = oldLineNum;
+                  displayNew = '';
+                  actualLineNumber = oldLineNum;
+                  oldLineNum++;
+                  bgClass = 'bg-rose-950 hover:bg-rose-900';
+                  textClass = 'text-rose-300';
+                  icon = <Minus size={16} className="inline-block text-rose-400 mr-1" />;
+                  isSelectable = true;
+                } else {
+                  displayOld = oldLineNum;
+                  displayNew = newLineNum;
+                  actualLineNumber = newLineNum;
+                  oldLineNum++;
+                  newLineNum++;
+                  bgClass = 'bg-gray-800 hover:bg-gray-700';
+                  textClass = 'text-gray-400';
+                  icon = null;
+                  isSelectable = false;
+                }
+
+                return (
+                  <div
+                    key={index}
+                    data-line-number={actualLineNumber ?? undefined}
+                    data-index={index}
+                    className={`flex items-center group border-b border-gray-700/60 ${bgClass}}`}
+                  >
+                    {/* 삭제 전 라인 번호 */}
+                    <span className="w-9 text-xs text-right opacity-50 select-none pr-1">
+                      {displayOld !== '' ? displayOld : ''}
+                    </span>
+                    {/* 추가 후 라인 번호 */}
+                    <span className="w-9 text-xs text-right opacity-50 select-none pr-1">
+                      {displayNew !== '' ? displayNew : ''}
+                    </span>
+                    {/* 줄 내용 */}
+                    <span className={`ml-2 flex items-center gap-1 ${textClass} whitespace-pre`}>
+                      {icon}
+                      {line}
+                    </span>
+                  </div>
+                );
+              });
+            })()}
+          </div>
         ) : (
-          <div className="text-gray-500 h-full flex items-center justify-center">
-            파일을 선택하세요
+          <div className="text-gray-500 flex items-center justify-center h-full">
+            파일을 선택하면 변경사항을 미리볼 수 있습니다.
           </div>
         )}
       </div>
