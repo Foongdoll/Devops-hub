@@ -48,7 +48,6 @@ export function useChanges(initialUnstaged: File[] = [], initialStaged: File[] =
 
   // 파일 선택 (ChangePanel)
   const selectFile = useCallback((file: File, remote: Remote) => {
-
     emit('fetch_file_diff', { remote: remote, filePath: file.path, fileStaged: file.staged });
 
     setFileDiff('');
@@ -127,8 +126,7 @@ export function useChanges(initialUnstaged: File[] = [], initialStaged: File[] =
   useEffect(() => {
     // 변경 파일 리스트 조회
     on('fetch_changed_files_response', (data: { resultFiles: File[], discard?: boolean }) => {
-      if (data.resultFiles) {
-        console.log(data.resultFiles);
+      if (data.resultFiles) {        
         const staged: File[] = [];
         const unstaged: File[] = [];
         data.resultFiles.forEach(file => {
@@ -151,7 +149,7 @@ export function useChanges(initialUnstaged: File[] = [], initialStaged: File[] =
     });
 
     // 파일 diff 조회
-    on('fetch_file_diff_response', (diff: string) => {
+    on('fetch_file_diff_response', (diff: string) => {      
       setFileDiff(diff);
     });
 
@@ -272,8 +270,11 @@ export function useChanges(initialUnstaged: File[] = [], initialStaged: File[] =
 
         if (data.staged) {
           setStagedFiles(prev => {
-            const newFiles = data.files.filter(f => f.path);
-            // 중복 제거 (path 기준)
+            const newFiles = data.files
+              .filter(f => f.path)
+              .map(f => ({ ...f, staged: data.staged })); // staged 값 설정
+            
+            console.log(newFiles);
             const existingPaths = new Set(prev.map(f => f.path));
             const filteredNewFiles = newFiles.filter(f => !existingPaths.has(f.path));
             return [...prev, ...filteredNewFiles];
@@ -282,7 +283,10 @@ export function useChanges(initialUnstaged: File[] = [], initialStaged: File[] =
           setUnstagedFiles(prev => prev.filter(f => !data.files.some(df => df.path === f.path)));
         } else {
           setUnstagedFiles(prev => {
-            const newFiles = data.files.filter(f => f.path);
+            const newFiles = data.files
+              .filter(f => f.path)
+              .map(f => ({ ...f, staged: data.staged })); // staged 값 설정
+            console.log(newFiles)
             const existingPaths = new Set(prev.map(f => f.path));
             const filteredNewFiles = newFiles.filter(f => !existingPaths.has(f.path));
             return [...prev, ...filteredNewFiles];

@@ -301,7 +301,6 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
         "-C", remote.path,
         "diff",
       ]
-
       fileStaged && cmd.push("--cached")
       cmd.push(filePath);
       // Git 명령어 실행
@@ -841,10 +840,19 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
     @MessageBody() data: { remote: Remote; files: { status: string; path: string; name: string; staged: boolean }[]; newStash: { name: string; message: string; files: File[] } },
     @ConnectedSocket() client: Socket,
   ) {
-    try {
+    try {      
       const { remote, files, newStash } = data;
       const f = files.map(e => e.path);
-      const args = ["-C", remote.path, "stash", "push", "-m", "--", newStash.message, ...f];
+      const args = [
+        "-C",
+        remote.path,
+        "stash",
+        "push",
+        "-m",
+        newStash.message, // message string here, no extra --
+        "--",
+        ...f // file paths
+      ];
 
       const { stdout } = await execFileAsync("git", args);
 

@@ -1,4 +1,4 @@
-import { Archive, FileText, Minus, PackagePlus, Plus, Trash2 } from 'lucide-react';
+import { Archive, CheckSquare, FileText, Minus, PackagePlus, Plus, Square, Trash2 } from 'lucide-react';
 import type { File } from '../../customhook/git/useChanges';
 import type { Remote } from '../../customhook/git/useRemote';
 import { useEffect, useState } from 'react';
@@ -103,31 +103,47 @@ const StashPanel: React.FC<StashPanelProps> = ({
           onChange={e => setStashMessage(e.target.value)}
           className="mb-2 px-2 py-1 rounded bg-gray-700 text-gray-100 text-xs"
         />
-        <ul className="space-y-1 flex-1 overflow-y-auto">
+        <ul className="space-y-1 flex-1 overflow-y-auto px-1">
           {stashChangedFiles.map(f => {
             const isSelected = selectedChangedFiles.some(sf => sf.path === f.path);
             return (
               <li
                 key={f.path}
                 className={`
-                  flex items-center px-2 py-2 rounded-lg cursor-pointer transition-all
-                  group
-                  ${isSelected
-                    ? 'bg-blue-900 text-blue-400 font-bold'
-                    : 'hover:bg-gray-700 text-gray-200'}
-                `}
+          flex items-center gap-3 px-3 py-2 rounded-md cursor-pointer select-none
+          transition-colors duration-200
+          ${isSelected
+                    ? 'bg-blue-800 text-blue-400 font-semibold shadow-inner'
+                    : 'text-gray-300 hover:bg-gray-700 hover:text-white'}
+          focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500
+        `}
                 title={f.name}
+                tabIndex={0}
                 onClick={() => handleToggleChangedFile(f)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handleToggleChangedFile(f);
+                  }
+                }}
               >
-                <input
-                  type="checkbox"
-                  checked={isSelected}
-                  onChange={() => handleToggleChangedFile(f)}
-                  className="mr-2 accent-blue-600"
-                  tabIndex={-1}
-                />
-                <FileText className="inline w-4 h-4 mr-2 flex-shrink-0" />
-                <span className="truncate block max-w-[210px] select-text">{f.name}</span>
+                {/* Lucide Icon checkbox substitute */}
+                {isSelected ? (
+                  <CheckSquare
+                    className="w-5 h-5 text-blue-400 flex-shrink-0"
+                    aria-hidden="true"
+                  />
+                ) : (
+                  <Square
+                    className="w-5 h-5 text-gray-400 flex-shrink-0"
+                    aria-hidden="true"
+                  />
+                )}
+
+                <FileText className={`w-5 h-5 flex-shrink-0 ${isSelected ? 'text-blue-400' : 'text-gray-400'}`} />
+                <span className="truncate flex-1" style={{ minWidth: 0 }}>
+                  {f.name}
+                </span>
               </li>
             );
           })}
