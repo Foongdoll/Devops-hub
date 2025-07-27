@@ -912,6 +912,23 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
         }
       }
 
+      // 스테이지에 안올라간 언트레킹 파일 스테이지에 올리기
+      // 스테이지에 올라간 언트레킹 파일은 --cached로 보이기 때문에 올릴 때만 처리
+      if (staged) {
+        const untrackingArgs = ['-C', remote.path, 'ls-files', '--others', '--exclude-standard']
+        const { stdout: untrackedStdout } = await execFileAsync('git', untrackingArgs);
+        
+        const arr = untrackedStdout.split("\n");      
+        for(const path of arr) {
+          if(path.trim() === "") continue;
+          await execFileAsync('git', ['-C', remote.path, 'add', '--', remote.path+"/"+path]);
+        }        
+      }
+
+
+
+
+
       // 4. 성공 응답
       sock.emit('git_stage_unstage_toggle_response', {
         success: true,
@@ -920,6 +937,7 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
         staged: staged,
       });
     } catch (error: any) {
+      
       sock.emit('git_stage_unstage_toggle_response', {
         success: false,
         message: error?.message ?? 'Stage/Unstage toggle failed',
@@ -1116,8 +1134,8 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
       });
     }
   }
-  
-  
+
+
   /**
     @param remote: Remote, commit: Commit, filePath: string  
   */
