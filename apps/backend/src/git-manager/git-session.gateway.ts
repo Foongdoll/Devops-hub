@@ -14,7 +14,7 @@ import { promisify } from 'util';
 import { exec, execFile } from 'child_process';
 import { promises as fs } from 'fs';
 import { JwtTokenService } from 'src/auth/jwt.service';
-import { Branch, fetch_commit_history, File } from 'src/common/type/git.interface';
+import { Branch, Commit, fetch_commit_history, File } from 'src/common/type/git.interface';
 import { Remote } from './entity/remote.entity';
 import { ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import path from 'path';
@@ -840,7 +840,7 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
     @MessageBody() data: { remote: Remote; files: { status: string; path: string; name: string; staged: boolean }[]; newStash: { name: string; message: string; files: File[] } },
     @ConnectedSocket() client: Socket,
   ) {
-    try {      
+    try {
       const { remote, files, newStash } = data;
       const f = files.map(e => e.path);
       const args = [
@@ -924,6 +924,225 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
         success: false,
         message: error?.message ?? 'Stage/Unstage toggle failed',
         files,
+      });
+    }
+  }
+
+  /**
+    @param data { remote: Remote }
+    @description Head 브랜치 tip hash 조회
+  */
+  @SubscribeMessage('fetch_head_branch_tip')
+  async handleFetchHeadBranchTip(
+    @MessageBody() data: { remote: Remote },
+    @ConnectedSocket() socket: Socket
+  ) {
+    try {
+      const { remote } = data;
+      const { stdout } = await execFileAsync("git", [
+        "-C", remote.path,
+        "rev-parse",
+        "HEAD"
+      ]);
+
+      const tipHash = stdout.trim();
+      socket.emit('fetch_head_branch_tip_response', { success: true, tipHash });
+    } catch (error) {
+      this.logger.error(`Git rev-parse command failed: ${error.message}`);
+      socket.emit('fetch_head_branch_tip_response', { success: false, message: error.message });
+    }
+  }
+
+
+
+  /**
+   * @param data { remote: Remote, hash: string }
+   * @description 커밋 해시로 체크아웃
+   */
+  @SubscribeMessage('git_checkout_commit')
+  async handleCheckoutCommit(
+    @MessageBody() data: { remote: Remote; hash: string },
+    @ConnectedSocket() socket: Socket
+  ) {
+    try {
+      const { remote, hash } = data;
+
+      // 1. 커밋 해시로 체크아웃
+      // (최신 git은 switch --detach, 구버전은 checkout도 가능)
+      await execFileAsync("git", [
+        "-C", remote.path,
+        "checkout",
+        hash
+      ]);
+
+      // 2. 현재 HEAD 해시가 원하는 커밋인지 검증
+      const { stdout: headHashRaw } = await execFileAsync("git", [
+        "-C", remote.path,
+        "rev-parse",
+        "HEAD"
+      ]);
+      const headHash = headHashRaw.trim();
+
+      if (headHash !== hash) {
+        socket.emit('git_checkout_commit_response', {
+          success: false,
+          error: `체크아웃 실패: HEAD가 예상 커밋(${hash})이 아닙니다. 실제 HEAD: ${headHash}`,
+        });
+        return;
+      }
+
+      // 3. 성공 응답
+      socket.emit('git_checkout_commit_response', {
+        success: true,
+        data: hash,
+        message: `커밋 ${hash}로 체크아웃 완료`,
+      });
+    } catch (error: any) {
+      socket.emit('git_checkout_commit_response', {
+        success: false,
+        message: error?.stderr || error?.message || '알 수 없는 에러',
+      });
+    }
+  }
+
+  @SubscribeMessage('git_merge_commit')
+  async handleMergeCommit(
+    @MessageBody() data: { remote: Remote; hash: string },
+    @ConnectedSocket() socket: Socket
+  ) {
+    try {
+      const { remote, hash } = data;
+
+      // 현재 작업 디렉토리에서 병합 실행
+      // 일반적으로: git merge <hash>
+      const { stdout } = await execFileAsync("git", [
+        "-C", remote.path,
+        "merge",
+        hash
+      ]);
+
+      socket.emit("git_merge_commit_response", {
+        ok: true,
+        message: `커밋 ${hash.slice(0, 8)} 병합 완료`
+      });
+    } catch (error: any) {
+      socket.emit("git_merge_commit_response", {
+        ok: false,
+        error: error?.stderr || error?.message || "알 수 없는 오류"
+      });
+    }
+  }
+
+  @SubscribeMessage('git_rebase_commit')
+  async handleRebaseCommit(
+    @MessageBody() data: { remote: Remote; hash: string },
+    @ConnectedSocket() socket: Socket
+  ) {
+    try {
+      const { remote, hash } = data;
+
+      // git rebase <hash>
+      const { stdout } = await execFileAsync("git", [
+        "-C", remote.path,
+        "rebase",
+        hash
+      ]);
+
+      socket.emit("git_rebase_commit_response", {
+        ok: true,
+        message: `커밋 ${hash.slice(0, 8)} 기준으로 리베이스 완료`
+      });
+    } catch (error: any) {
+      socket.emit("git_rebase_commit_response", {
+        ok: false,
+        error: error?.stderr || error?.message || "알 수 없는 오류"
+      });
+    }
+  }
+
+  @SubscribeMessage('git_tag_commit')
+  async handleTagCommit(
+    @MessageBody() data: { remote: Remote; hash: string; tag: string },
+    @ConnectedSocket() socket: Socket
+  ) {
+    try {
+      const { remote, hash, tag } = data;
+
+      // git tag <tag> <hash>
+      await execFileAsync("git", [
+        "-C", remote.path,
+        "tag",
+        tag,
+        hash
+      ]);
+
+      socket.emit("git_tag_commit_response", {
+        ok: true,
+        message: `태그 '${tag}'가 커밋 ${hash.slice(0, 8)}에 생성되었습니다.`,
+      });
+    } catch (error: any) {
+      socket.emit("git_tag_commit_response", {
+        ok: false,
+        error: error?.stderr || error?.message || "태그 생성 실패",
+      });
+    }
+  }
+
+
+  @SubscribeMessage('fetch_commit_files')
+  async handleFetchCommitFiles(
+    @MessageBody() data: { remote: Remote; commit: Commit },
+    @ConnectedSocket() socket: Socket
+  ) {
+    try {
+      const { remote, commit } = data;
+      // 파일 목록 가져오기
+      const { stdout } = await execFileAsync("git", [
+        "-C", remote.path,
+        "show",
+        "--name-only",
+        "--pretty=",
+        commit.hash
+      ]);
+      const files = stdout
+        .split('\n')
+        .map(f => f.trim())
+        .filter(f => !!f);
+      socket.emit("fetch_commit_files_response", { ok: true, files });
+    } catch (error: any) {
+      socket.emit("fetch_commit_files_response", {
+        ok: false,
+        error: error?.stderr || error?.message || "파일 목록 로딩 실패"
+      });
+    }
+  }
+  
+  
+  /**
+    @param remote: Remote, commit: Commit, filePath: string  
+  */
+  @SubscribeMessage('fetch_commit_files_diff')
+  async handleFetchCommitFilesDiff(
+    @MessageBody() data: { remote: Remote; commit: Commit; filePath: string },
+    @ConnectedSocket() socket: Socket
+  ) {
+    try {
+      console.log(data);
+      const { remote, commit, filePath } = data;
+      // 파일 수정 내역(diff) 가져오기
+      const { stdout } = await execFileAsync("git", [
+        "-C", remote.path,
+        "show",
+        commit.hash,
+        "--",
+        filePath
+      ]);
+      socket.emit("fetch_commit_files_diff_response", { ok: true, diff: stdout });
+    } catch (error: any) {
+      console.log(error);
+      socket.emit("fetch_commit_files_diff_response", {
+        ok: false,
+        error: error?.stderr || error?.message || "파일 diff 로딩 실패"
       });
     }
   }

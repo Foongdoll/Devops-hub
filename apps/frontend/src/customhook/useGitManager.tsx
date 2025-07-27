@@ -9,7 +9,7 @@ import { useGitSocket } from '../context/GitSocketContext';
 import { useRemoteContext } from '../context/RemoteContext';
 import { showToast } from '../utils/notifyStore';
 
-export type tabType = 'history' | 'remotes' | 'changes' | 'branches' | 'stash';
+export type tabType = 'history' | 'remotes' | 'changes' | 'branches' | 'stash' | 'commitview';
 
 
 export const useGitManager = () => {

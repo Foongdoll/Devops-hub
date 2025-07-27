@@ -274,7 +274,7 @@ export function useChanges(initialUnstaged: File[] = [], initialStaged: File[] =
               .filter(f => f.path)
               .map(f => ({ ...f, staged: data.staged })); // staged 값 설정
             
-            console.log(newFiles);
+            // console.log(newFiles);
             const existingPaths = new Set(prev.map(f => f.path));
             const filteredNewFiles = newFiles.filter(f => !existingPaths.has(f.path));
             return [...prev, ...filteredNewFiles];
@@ -286,7 +286,7 @@ export function useChanges(initialUnstaged: File[] = [], initialStaged: File[] =
             const newFiles = data.files
               .filter(f => f.path)
               .map(f => ({ ...f, staged: data.staged })); // staged 값 설정
-            console.log(newFiles)
+            // console.log(newFiles)
             const existingPaths = new Set(prev.map(f => f.path));
             const filteredNewFiles = newFiles.filter(f => !existingPaths.has(f.path));
             return [...prev, ...filteredNewFiles];

@@ -1,4 +1,5 @@
 import { io, Socket } from 'socket.io-client';
+import { showToast } from '../utils/notifyStore';
 
 class SocketService {
   private socket: Socket | null = null;
@@ -30,6 +31,10 @@ class SocketService {
 
     this.socket.on('connect_error', (error) => {
       console.error('Socket connection error:', error);
+      if(String(error).includes('jwt expired')){
+        showToast('세션이 만료되었습니다.\n로그인 페이지로 이동합니다.','error');
+        window.location.href = '/login';      
+      }
       this.reconnectAttempts++;
 
       if (this.reconnectAttempts >= this.maxReconnectAttempts) {

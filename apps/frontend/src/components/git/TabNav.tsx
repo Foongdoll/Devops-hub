@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { Cloud, List, GitBranch, Inbox, History } from "lucide-react";
+import { Cloud, List, GitBranch, Inbox, History, FileArchive } from "lucide-react";
 import { showToast } from '../../utils/notifyStore';
 import type { Remote } from '../../customhook/git/useRemote';
 import { useRemoteContext } from '../../context/RemoteContext';
 import { motion } from "framer-motion";
+import type { Commit } from "../../customhook/git/useCommitHistory";
 
 const tabs = [
   { key: 'remotes', icon: <Cloud />, label: 'Remotes' },
@@ -11,22 +12,25 @@ const tabs = [
   { key: 'branches', icon: <GitBranch />, label: 'Branches' },
   { key: 'stash', icon: <Inbox />, label: 'Stash' },
   { key: 'history', icon: <History />, label: 'History' },
+  { key: 'commitview', icon: <FileArchive />, label: 'CommitView' },
 ];
 
 export interface TabNavProps {
-  active: 'remotes' | 'changes' | 'branches' | 'stash' | 'history';
-  onChange: (tab: 'remotes' | 'changes' | 'branches' | 'stash' | 'history') => void;
+  active: 'remotes' | 'changes' | 'branches' | 'stash' | 'history' | 'commitview';
+  onChange: (tab: 'remotes' | 'changes' | 'branches' | 'stash' | 'history' | 'commitview') => void;
   children?: React.ReactNode;
-  selectedRemote?: Remote | null;
+  selectedRemote: Remote | null;
+  selectedCommit: Commit | null;
+  setSelectedCommit: (commit: Commit | null) => void;
 }
 
 const iconVariants = {
   initial: { rotate: 0, scale: 1 },
-  hover:   { rotate: 360, scale: 1.24, transition: { type: "spring", duration: 0.38 } }
+  hover: { rotate: 360, scale: 1.24, transition: { type: "spring", duration: 0.38 } }
 };
 
 const TabNav: React.FC<TabNavProps> = ({
-  active, onChange, children, selectedRemote
+  active, onChange, children, selectedRemote, selectedCommit, setSelectedCommit
 }) => {
   const { setSelectedRemote, changesCount } = useRemoteContext();
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
@@ -63,6 +67,14 @@ const TabNav: React.FC<TabNavProps> = ({
               onClick={() => {
                 if (selectedRemote) {
                   if (tab.key === 'remotes') setSelectedRemote(null);
+                  else if (tab.key === 'commitview') {
+                    if (!selectedCommit) {
+                      showToast("내역을 확인 할 커밋을 선택해주세요.", "warn");
+                      return;
+                    }
+                  } else {
+                    setSelectedCommit(null);
+                  }
                   onChange(tab.key as any);
                 } else {
                   showToast('먼저 리모트를 선택해주세요.', 'warn');

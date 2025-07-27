@@ -1,38 +1,48 @@
-import React, { useEffect, type JSX } from "react";
+import React, { useEffect, useState, type JSX } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { MoreVertical, GitBranch, ChevronDown, ChevronRight } from "lucide-react";
+import { MoreVertical, GitBranch, ChevronDown, ChevronRight, Files } from "lucide-react";
 import type { Commit } from "../../customhook/git/useCommitHistory";
 import { useRemoteContext } from "../../context/RemoteContext";
 import { TopStageBar } from "./GitBranchBar";
 import type { Remote } from "../../customhook/git/useRemote";
 import type { Branch } from "../../customhook/git/useBranches";
 import { useGitSocket } from "../../context/GitSocketContext";
-import { hideLoading } from "../../utils/notifyStore";
+import { hideLoading, showToast } from "../../utils/notifyStore";
+import { CommitContextMenu } from "./CommitContextMenu"; // <- Portal 버전
+import type { File } from "../../customhook/git/useChanges";
+import type { tabType } from "../../customhook/useGitManager";
 
 export interface CommitHistoryPanelProps {
+  setTab: (tab: tabType) => void;
   commits: Map<string, Commit[]>;
   setCommits: (commits: Map<string, Commit[]>) => void;
   onContextMenu: (commit: Commit, pos: { x: number; y: number }) => void;
   selectedHash?: string | null;
   selectCommit?: (hash: string) => void;
   closeContextMenu?: () => void;
-  handleMenuAction?: (action: string, commit: Commit) => void;
+  handleMenuAction?: (remote: Remote | null, action: string, commit: Commit) => void;
   onSelectBranch?: (branch: string) => void;
   fetchCommitHistory: (remote: Remote, branches: Branch[]) => void;
   onSelectLocalBranch: (branch: string, remote: Remote) => void;
   onSelectRemoteBranch: (branch: string) => void;
+  fetchHeadBranchTip: (remote: Remote) => void;
+  setCurrentBranchTipHash: (hash: string) => void;
+  currentBranchTipHash: string;
+  commitFiles: File[]
+  setCommitFiles: (files: File[]) => void;  
+  onCommitFiles: (remote: Remote, commit: Commit) => void;
+  onCommitFileDiff: (remote: Remote | null, commit: Commit | null, file: File) => void;
 }
 
 const COMMIT_ROW_HEIGHT = 44;
 const GRAPH_WIDTH = 36;
 
-// commit graph node "팡!" 이펙트
 function renderGraph(
   index: number,
   commit: Commit,
   hashToIndex: Record<string, number>,
   selectedHash: string | null,
-  isActive: boolean
+  popEffect: boolean
 ) {
   const nodeY = COMMIT_ROW_HEIGHT / 2;
   const lines: JSX.Element[] = [];
@@ -74,7 +84,6 @@ function renderGraph(
         stroke="#334155"
         strokeWidth={2}
       />
-      {/* 동적 효과 (팡팡, glow) */}
       <motion.circle
         cx={GRAPH_WIDTH / 2}
         cy={nodeY}
@@ -82,10 +91,10 @@ function renderGraph(
         fill={selectedHash === commit.hash ? "#3b82f6" : "#1e293b"}
         stroke="#60a5fa"
         strokeWidth={selectedHash === commit.hash ? 4 : 2}
-        animate={isActive ? { scale: [1, 1.22, 1] } : { scale: 1 }}
-        transition={isActive ? { duration: 0.29, type: "spring", bounce: 0.5 } : {}}
+        animate={popEffect ? { scale: [1, 1.22, 1] } : { scale: 1 }}
+        transition={popEffect ? { duration: 0.29, type: "tween", bounce: 0.5 } : {}}
         style={{
-          filter: isActive
+          filter: popEffect
             ? "drop-shadow(0 0 8px #60a5fa55)"
             : selectedHash === commit.hash
               ? "drop-shadow(0 0 3px #60a5fa99)"
@@ -97,6 +106,7 @@ function renderGraph(
 }
 
 export const CommitHistoryPanel: React.FC<CommitHistoryPanelProps> = ({
+  setTab,
   commits,
   setCommits,
   onContextMenu,
@@ -108,14 +118,24 @@ export const CommitHistoryPanel: React.FC<CommitHistoryPanelProps> = ({
   fetchCommitHistory,
   onSelectLocalBranch,
   onSelectRemoteBranch,
+  fetchHeadBranchTip,
+  setCurrentBranchTipHash,
+  currentBranchTipHash,
+  commitFiles,
+  setCommitFiles,  
+  onCommitFiles,
+  onCommitFileDiff
 }) => {
   const { localBranches, remoteBranches, selectedRemote, selectedLocalBranch, selectedRemoteBranch } = useRemoteContext();
   const { on, off, emit } = useGitSocket();
 
   // 브랜치별 오픈 상태
   const [openBranches, setOpenBranches] = React.useState<{ [branch: string]: boolean }>({});
+  // context menu info (커밋+위치)
+  const [contextMenu, setContextMenu] = useState<{ commit: Commit; pos: { x: number; y: number } } | null>(null);
+  // 팡 이펙트용
+  const [popHash, setPopHash] = useState<string | null>(null);
 
-  // 브랜치 토글 함수
   const toggleBranch = (branchName: string) => {
     setOpenBranches((prev) => ({
       ...prev,
@@ -123,19 +143,81 @@ export const CommitHistoryPanel: React.FC<CommitHistoryPanelProps> = ({
     }));
   };
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!selectedRemote || !remoteBranches) return;
     fetchCommitHistory(selectedRemote, remoteBranches);
+    fetchHeadBranchTip(selectedRemote);
 
+
+    // 커밋 히스토리 응답 핸들러
     const handler = (commits: Map<string, Commit[]>) => {
       setCommits(commits);
       hideLoading();
     };
 
-    on("fetch_commit_history_response", handler);
+    // 헤드 브랜치 팁 해시를 가져오는 응답 핸들러
+    const fetchHeadBranchTipHandler = (data: { success: boolean, hash: string, error?: string }) => {
+      if (data.success) {
+        setCurrentBranchTipHash(data.hash);
+      } else {
+        showToast(data.error || "헤드 브랜치 팁을 가져오는 데 실패했습니다.", "error");
+      }
+    };
 
+    // 체크아웃 커밋 응답 핸들러
+    const checkoutCommitResponseHandler = (data: { success: boolean, data: string, message: string }) => {
+      if (data.success) {
+        showToast(data.message, "success");
+      } else {
+        showToast(data.message, "error");
+      }
+    }
+
+    const onMergeResponse = (res: { ok: boolean; error?: string; message?: string }) => {
+      if (res.ok) showToast(res.message || "병합 성공!", "success");
+      else showToast(res.error || "병합 실패!", "error");
+    };
+
+    const onRebaseResponse = (res: { ok: boolean; error?: string; message?: string }) => {
+      if (res.ok) showToast(res.message || "리베이스 성공!", "success");
+      else showToast(res.error || "리베이스 실패!", "error");
+    };
+
+    const onTagResponse = (res: { ok: boolean; error?: string; message?: string }) => {
+      if (res.ok) showToast(res.message || "태그 생성 완료!", "success");
+      else showToast(res.error || "태그 생성 실패!", "error");
+    };
+
+    const handleFiles = (res: { ok: boolean; files: string[]; error?: string }) => {      
+      if (res.ok && res.files) {
+
+        const files: File[] = [];
+
+        res.files.forEach(e => {
+          const file = { name: e, path: e, status: 'M', staged: true } as File;
+          files.push(file);
+        })
+
+        setCommitFiles(files)
+      } else {
+        showToast(res.error || "파일 목록을 불러오지 못했습니다.", "error");
+      }
+    };
+   
+    on("fetch_commit_files_response", handleFiles);
+    on("git_tag_commit_response", onTagResponse);
+    on("git_rebase_commit_response", onRebaseResponse);
+    on("git_checkout_commit_response", checkoutCommitResponseHandler)
+    on("fetch_head_branch_tip_response", fetchHeadBranchTipHandler)
+    on("fetch_commit_history_response", handler);
+    on("git_merge_commit_response", onMergeResponse);
     return () => {
+      off("git_tag_commit_response", onTagResponse)
+      off("git_rebase_commit_response", onRebaseResponse)
+      off("git_checkout_commit_response", checkoutCommitResponseHandler);
+      off("fetch_head_branch_tip", fetchHeadBranchTipHandler);
       off("fetch_commit_history_response", handler);
+      off("git_merge_commit_response", onMergeResponse)
     };
   }, [selectedRemote]);
 
@@ -147,8 +229,13 @@ export const CommitHistoryPanel: React.FC<CommitHistoryPanelProps> = ({
     return hashToIndex;
   }
 
-  // 커밋 row effect state
-  const [popIndex, setPopIndex] = React.useState<number | null>(null);
+  // ESC 시 메뉴 닫기
+  useEffect(() => {
+    if (!contextMenu) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") setContextMenu(null); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [contextMenu]);
 
   return (
     <section className="bg-gradient-to-b from-[#20213a] via-[#22234b] to-[#292a3e] p-4 rounded-2xl shadow-xl flex flex-col gap-4 h-full w-full overflow-auto border border-[#36366d]">
@@ -168,7 +255,6 @@ export const CommitHistoryPanel: React.FC<CommitHistoryPanelProps> = ({
 
         return (
           <div key={branchName} className="mb-4">
-            {/* 브랜치 헤더 - 슉슉 애니메이션 */}
             <motion.div
               className="flex items-center mb-2 cursor-pointer select-none w-fit"
               onClick={() => toggleBranch(branchName)}
@@ -191,7 +277,6 @@ export const CommitHistoryPanel: React.FC<CommitHistoryPanelProps> = ({
               <span className="font-bold text-base text-cyan-200">{branchName}</span>
             </motion.div>
 
-            {/* 커밋 리스트: 슉슉 열림 */}
             <AnimatePresence initial={false}>
               {open && (
                 <motion.div
@@ -201,11 +286,15 @@ export const CommitHistoryPanel: React.FC<CommitHistoryPanelProps> = ({
                   animate={{ height: "auto", opacity: 1, y: 0 }}
                   exit={{ height: 0, opacity: 0, y: -12 }}
                   transition={{ duration: 0.28, ease: [0.4, 0.65, 0.3, 1] }}
-                  style={{ overflow: "hidden" }}
+                  style={{
+                    overflow: "hidden",
+                    position: "relative",
+                    zIndex: 0
+                  }}
                 >
                   {commitList.map((commit, idx) => {
                     const isSelected = selectedHash === commit.hash;
-                    const isPop = popIndex === idx;
+                    const isPop = popHash === commit.hash;
 
                     return (
                       <motion.div
@@ -219,29 +308,22 @@ export const CommitHistoryPanel: React.FC<CommitHistoryPanelProps> = ({
                           marginBottom: 2,
                           paddingTop: 5,
                           paddingBottom: 5,
-                          paddingRight: 24,         // 오른쪽 padding 추가!
+                          paddingRight: 24,
                           position: "relative",
-                          overflow: "hidden",       // 핵심! scale시 overflow 차단
-                        }}
-                        whileHover={{
-                          scale: isSelected ? 1.10 : 1.045,
-                          boxShadow: "0 4px 20px #6e70f222"
-                        }}
-                        transition={{
-                          scale: { duration: 0.13 },
-                          boxShadow: { duration: 0.16, ease: "linear" }
+                          overflow: "hidden",
+                          zIndex: isSelected ? 10 : isPop ? 9 : 1,
                         }}
                         whileTap={{
                           boxShadow: "0 0 40px 8px #43fff255,0 0 20px #7e4cff44"
                         }}
                         onClick={() => {
-                          setPopIndex(idx);
+                          setPopHash(commit.hash);
                           selectCommit?.(commit.hash);
-                          setTimeout(() => setPopIndex(null), 270);
+                          setTimeout(() => setPopHash(null), 290);
                         }}
                         onContextMenu={(e) => {
                           e.preventDefault();
-                          onContextMenu(commit, { x: e.clientX, y: e.clientY });
+                          setContextMenu({ commit, pos: { x: e.clientX, y: e.clientY } });
                         }}
                       >
                         <div style={{ width: GRAPH_WIDTH, minWidth: GRAPH_WIDTH, marginRight: 10 }}>
@@ -257,7 +339,7 @@ export const CommitHistoryPanel: React.FC<CommitHistoryPanelProps> = ({
                           <span className="text-sm text-gray-100 truncate">
                             {commit.message}
                             {commit.refs && (
-                              <span className="mr-3 ml-1 px-2 py-0.5 text-xs rounded bg-purple-950 text-purple-300 whitespace-nowrap flex-shrink-0 ml-2">
+                              <span className="mr-3 px-2 py-0.5 text-xs rounded bg-purple-950 text-purple-300 whitespace-nowrap flex-shrink-0 ml-2">
                                 {commit.refs}
                               </span>
                             )}
@@ -267,8 +349,18 @@ export const CommitHistoryPanel: React.FC<CommitHistoryPanelProps> = ({
                           </span>
                         </div>
                         {handleMenuAction && (
-                          <div className="ml-auto pr-3 flex-shrink-0">   {/* shrink 방지! */}
-                            <MoreVertical size={18} onClick={e => { e.stopPropagation(); handleMenuAction("menu", commit); }} />
+                          <div className="ml-auto pr-3 flex-shrink-0">
+                            <MoreVertical
+                              size={18}
+                              onClick={e => {
+                                e.stopPropagation();
+                                setContextMenu(null);
+                                setTimeout(() => {
+                                  setContextMenu({ commit, pos: { x: e.clientX, y: e.clientY } });
+                                }, 0);
+                              }}
+                            />
+
                           </div>
                         )}
                       </motion.div>
@@ -280,6 +372,17 @@ export const CommitHistoryPanel: React.FC<CommitHistoryPanelProps> = ({
           </div>
         );
       })}
+
+      {contextMenu && handleMenuAction && (
+        <CommitContextMenu
+          key={contextMenu.commit.hash + '-' + contextMenu.pos.x + '-' + contextMenu.pos.y}
+          commit={contextMenu.commit}
+          pos={contextMenu.pos}
+          onAction={handleMenuAction}
+          remote={selectedRemote}
+          setTab={setTab}
+        />
+      )}
     </section>
   );
 };

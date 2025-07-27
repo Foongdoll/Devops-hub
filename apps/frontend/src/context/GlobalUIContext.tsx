@@ -48,14 +48,20 @@ export function GlobalUIProvider({ children }: { children: ReactNode }) {
 
   // 여기서 구독해서 notifyStore의 showToast 호출을 실제로 "받아" 처리합니다.
   useEffect(() => {
-    const unsubscribe = subscribe(({ message, type }) => {
-      if (type === 'loading') setLoading(true);
-      else if (type === 'loading-hide') setLoading(false);
-      else if (type === 'confirm') {
-        showConfirm(message, confirmState.description || "", confirmState.options || {})
+    const unsubscribe = subscribe((msg) => {
+      if (msg.type === 'loading') setLoading(true);
+      else if (msg.type === 'loading-hide') setLoading(false);
+      else if (msg.type === 'confirm') {
+        setConfirmState({
+          open: true,
+          message: msg.message,
+          description: msg.description || "",
+          options: msg.options || {},
+          resolve: msg.resolve, // 반드시 msg.resolve!
+        });
       }
       else {
-        setToast({ message, type: type as any });
+        setToast({ message: msg.message, type: msg.type as any });
         setTimeout(() => setToast(null), 3000);
       }
     });
@@ -63,6 +69,7 @@ export function GlobalUIProvider({ children }: { children: ReactNode }) {
     setCheckbox(confirmState.options?.checkbox?.value ?? false);
     return unsubscribe;
   }, []);
+
 
   const showConfirm = (message: string, description?: string, options?: ConfirmOptions) => {
     return new Promise<[boolean, any]>(resolve => {

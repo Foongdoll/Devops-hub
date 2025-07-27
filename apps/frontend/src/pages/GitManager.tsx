@@ -7,6 +7,7 @@ import { useGitManager } from "../customhook/useGitManager";
 import { CommitHistoryPanel } from "../components/git/CommitHistoryPanel";
 import { ConflictModal } from "../components/git/ConflictModal";
 import { useRemoteContext } from "../context/RemoteContext";
+import CommitViewPanel from "../components/git/CommitViewPanel";
 
 
 const GitManager = () => {
@@ -26,7 +27,11 @@ const GitManager = () => {
         overflow-hidden
       "
     >
-      <TabNav active={git.tab} onChange={git.setTab} selectedRemote={git.selectedRemote}>
+      <TabNav active={git.tab} 
+      onChange={git.setTab} 
+      selectedRemote={git.selectedRemote} 
+      selectedCommit={git.selectedCommit} 
+      setSelectedCommit={git.setselectedCommit}>
         <TopActionBar
           onPush={git.push}
           onPull={git.pull}
@@ -37,7 +42,7 @@ const GitManager = () => {
       </TabNav>
 
       {/* 메인 컨텐츠 */}
-      <main className="flex-1 overflow-y-auto">
+      <main className="flex-1 h-fit">
         {git.tab === "history" && (
           <CommitHistoryPanel
             commits={git.commits}
@@ -51,8 +56,25 @@ const GitManager = () => {
             fetchCommitHistory={git.fetchCommitHistory}
             onSelectLocalBranch={git.selecteLocalBranch}
             onSelectRemoteBranch={git.selectRemoteBranch}
+            fetchHeadBranchTip={git.fetchHeadBranchTip}
+            setCurrentBranchTipHash={git.setCurrentBranchTipHash}
+            currentBranchTipHash={git.currentBranchTipHash}
+            commitFiles={git.commitFiles}
+            setCommitFiles={git.setCommitFiles}            
+            onCommitFiles={git.onCommitFiles}
+            onCommitFileDiff={git.onCommitFileDiff}
+            setTab={git.setTab}
           />
         )}
+        {git.tab === "commitview" && (
+          <CommitViewPanel 
+          selectedCommit={git.selectedCommit} 
+          commitFiles={git.commitFiles}
+          onCommitFileDiff={git.onCommitFileDiff}                              
+          setCommitFiles={git.setCommitFiles}          
+          />
+        )}
+        
         {git.tab === "remotes" && (
           <RemotesPanel
             remotes={git.remotes}

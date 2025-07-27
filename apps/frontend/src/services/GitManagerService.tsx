@@ -3,6 +3,7 @@ import { apiRequest } from "../axios/axiosInstance";
 import type { Remote } from "../customhook/git/useRemote";
 import type { Branch, TrackingBranch } from "../customhook/git/useBranches";
 import type { Stash } from "../customhook/git/useStash";
+import { showToast } from "../utils/notifyStore";
 
 // Remote Fetch
 export async function fetchRemotesImpl(): Promise<Remote[]> {
@@ -104,6 +105,10 @@ class GitService {
 
     this.socket.on('connect_error', (error) => {
       console.error('Socket connection error:', error);
+      if (String(error).includes('jwt expired')) {
+        showToast('세션이 만료되었습니다.\n로그인 페이지로 이동합니다.', 'error');
+        window.location.href = '/login';
+      }
       this.reconnectAttempts++;
 
       if (this.reconnectAttempts >= this.maxReconnectAttempts) {
