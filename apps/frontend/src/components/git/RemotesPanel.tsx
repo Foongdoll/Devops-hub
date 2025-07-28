@@ -26,7 +26,8 @@ const RemotesPanel: React.FC<RemotesPanelProps> = ({
 
   // 폴더 선택 (웹에서는 제한 있음)
   const handleBrowseFolder = async () => {
-    showToast('보안상 폴더 선택 기능은 웹에서는 지원하지 않습니다.\nElectron에서만 동작합니다.', 'warn');
+    const folder = await window.api?.selectFolder();
+    setForm(f => ({ ...f, path: folder }))
   };
 
   // 추가/수정
@@ -96,7 +97,7 @@ const RemotesPanel: React.FC<RemotesPanelProps> = ({
                 className="flex-1 px-3 py-2 rounded-lg bg-white text-[#5a5799] border border-[#ecebff] focus:outline-none"
                 placeholder="로컬 폴더 경로"
                 value={form.path}
-                onChange={e => setForm(f => ({ ...f, path: e.target.value }))}
+                disabled={true}
               />
               <button
                 type="button"

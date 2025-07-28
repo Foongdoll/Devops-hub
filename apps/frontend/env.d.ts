@@ -13,6 +13,7 @@ declare global {
       close: () => void;
       onMaximized: (callback: () => void) => void;
       onRestored: (callback: () => void) => void;
+      selectFolder: () => string;
     };
   }
 }

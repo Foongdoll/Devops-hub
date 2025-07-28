@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 
 let mainWindow;
@@ -28,6 +28,14 @@ function createWindow() {
   ipcMain.handle('window:unmaximize', () => mainWindow.unmaximize());
   ipcMain.handle('window:isMaximized', () => mainWindow.isMaximized());
   ipcMain.handle('window:close', () => mainWindow.close());
+  ipcMain.handle('select-folder', async (event) => {
+    const { canceled, filePaths } = await dialog.showOpenDialog({
+      properties: ['openDirectory'],
+      title: '폴더 선택',
+    });
+    if (canceled) return null;
+    return filePaths[0]; // 첫 번째 선택된 폴더 경로 반환
+  });
 
   // 최대화/복원 시 상태 알림 (선택)
   mainWindow.on('maximize', () => {

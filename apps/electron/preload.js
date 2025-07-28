@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('api', {
   // 이벤트 구독 (최대화/복원 감지)
   onMaximized: (callback) => ipcRenderer.on('window:maximized', callback),
   onRestored: (callback) => ipcRenderer.on('window:restored', callback),  
+  selectFolder: () => ipcRenderer.invoke("select-folder"),
 });
 
 contextBridge.exposeInMainWorld('env', { isElectron: true });
