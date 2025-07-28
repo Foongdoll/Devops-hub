@@ -9,7 +9,7 @@ import * as fs from 'fs';
 import { UserType } from 'src/common/decorator/user.decorator';
 import { AddRemoteDto } from './dto/addRemote.dto';
 import { v4 as uuid } from 'uuid';
-import { File, Stash } from 'src/common/type/git.interface';
+import { Branch, File, Stash } from 'src/common/type/git.interface';
 const execFileAsync = promisify(execFile);
 
 @Injectable()
@@ -128,35 +128,53 @@ export class GitManagerService {
 
       const { stdout: remoteB, stderr: remoteErr } = await execFileAsync('git', ['-C', remote.path, 'branch', '-a']);
       const { stdout: localB, stderr: branchErr } = await execFileAsync('git', ['-C', remote.path, 'branch']);
-      if (branchErr) {
-        this.logger.error(`Git branch error: ${branchErr}`);
-        return ApiResponse.error('브랜치 목록 조회에 실패했습니다.', { code: '500' });
-      }
+      const { stdout: trackingBranches } = await execFileAsync('git', ['-C', remote.path, 'branch', '-vv']);
 
-      const localBranches = localB
+      // 🧠 Build tracking map from -vv output
+      const trackingMap: Record<string, string | undefined> = {};
+      trackingBranches.split('\n').forEach(line => {
+        const match = line.match(/^\*?\s+(\S+)\s+[a-f0-9]+\s+\[([^\]]+)\]/);
+        if (match) {
+          const local = match[1]; // branch name
+          const upstream = match[2].split(':')[0].trim(); // just 'origin/branch'
+          trackingMap[local] = upstream;
+        }
+      });
+
+      // ✅ Local branches with upstream
+      const localBranches: Branch[] = localB
         .split('\n')
         .filter(b => b.trim() !== '')
-        .map(b => ({ name: b.replace('* ', '').trim(), current: b.startsWith('*') }))
+        .map(line => {
+          const current = line.startsWith('*');
+          const name = line.replace('* ', '').trim();
+          return {
+            name,
+            current,
+            upstream: trackingMap[name] ?? undefined,
+          };
+        });
 
-      const { stdout: trackingBranches, stderr: trackErr } = await execFileAsync('git', ['-C', remote.path, 'branch', '-vv']);
+      // ✅ Detect current remote branch from -vv output
+      let currentRemoteBranch: string | undefined = trackingBranches
+        .split('\n')
+        .map(b => b.startsWith('*') ? b.split('[')[1]?.split(']')[0] : undefined)
+        .find(Boolean);
 
-      var current = trackingBranches.split('\n').map(b => {
-        if (b.startsWith('*')) {
-          return b.split('[')[1].split(']')[0];
-        }
-      }).find(Boolean);
-
-      if (current?.includes(":")) {
-        current = current.split(':')[0].trim();
+      if (currentRemoteBranch?.includes(':')) {
+        currentRemoteBranch = currentRemoteBranch.split(':')[0].trim();
       }
 
-      const remoteBranches = remoteB.split('\n').filter(b =>
-        b.trim().startsWith('remotes/')).map(b =>
-          ({ name: b.replace('remotes/', '').trim(), current: b.replace('remotes/', '').trim() === current ? true : false }));
-
-      // console.log(`로컬 브랜치 목록: ${JSON.stringify(localBranches)}`);
-      // console.log(`원격 브랜치 목록: ${JSON.stringify(remoteBranches)}`);
-
+      const remoteBranches: Branch[] = remoteB
+        .split('\n')
+        .filter(b => b.trim().startsWith('remotes/'))
+        .map(b => {
+          const name = b.replace('remotes/', '').trim();
+          return {
+            name,
+            current: name === currentRemoteBranch,
+          };
+        });
 
       return ApiResponse.success({ local: localBranches, remote: remoteBranches });
     } catch (error) {
@@ -210,7 +228,7 @@ export class GitManagerService {
     try {
       const { stdout, stderr } = await execFileAsync('git', ['-C', remote.path, 'stash', 'drop', stashName]);
       this.logger.log(`스태시 삭제 성공: ${stdout}`);
-      return ApiResponse.success(undefined, '스태시가 삭제되었습니다.');  
+      return ApiResponse.success(undefined, '스태시가 삭제되었습니다.');
     } catch (error) {
       this.logger.error(`스태시 삭제 중 오류 발생: ${error}`);
       return ApiResponse.error('스태시 삭제에 실패했습니다.', { type: 'error' });

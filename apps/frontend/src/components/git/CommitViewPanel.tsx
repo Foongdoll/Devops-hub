@@ -151,7 +151,7 @@ export const CommitViewPanel: React.FC<CommitViewPanelProps> = ({
 
   return (
     <section className="
-      flex h-[calc(100vh-130px)] rounded-2xl shadow-lg border border-[#ececff] bg-gradient-to-b from-[#f7f5fe] to-[#ede8fa] overflow-hidden
+      flex h-[calc(100%)] rounded-2xl shadow-lg border border-[#ececff] bg-gradient-to-b from-[#f7f5fe] to-[#ede8fa]
       animate-fade-in-up
     ">
       {/* 좌측 파일 목록 */}

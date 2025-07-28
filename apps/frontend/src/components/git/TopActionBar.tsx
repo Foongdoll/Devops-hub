@@ -30,7 +30,7 @@ const TopActionBar: React.FC<TopActionBarProps> = ({
   const { showToast } = useGlobalUI();
 
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex flex-wrap items-center gap-1 md:gap-2 min-w-0 max-w-full">
       <div className="relative">
         <button
           onClick={async () => {

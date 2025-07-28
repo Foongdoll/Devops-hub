@@ -8,6 +8,7 @@ import { CommitHistoryPanel } from "../components/git/CommitHistoryPanel";
 import { ConflictModal } from "../components/git/ConflictModal";
 import { useRemoteContext } from "../context/RemoteContext";
 import CommitViewPanel from "../components/git/CommitViewPanel";
+import BranchesPanel from "../components/git/BranchsPanel";
 
 
 const GitManager = () => {
@@ -23,15 +24,16 @@ const GitManager = () => {
         rounded-2xl
         shadow-[0_6px_32px_0_rgba(126,76,255,0.14)]
         border border-[#4f389a]/30
-        transition-all
-        overflow-hidden
+        transition-all     
+        overflow-y-hidden 
+        overflow-x-auto
       "
     >
-      <TabNav active={git.tab} 
-      onChange={git.setTab} 
-      selectedRemote={git.selectedRemote} 
-      selectedCommit={git.selectedCommit} 
-      setSelectedCommit={git.setselectedCommit}>
+      <TabNav active={git.tab}
+        onChange={git.setTab}
+        selectedRemote={git.selectedRemote}
+        selectedCommit={git.selectedCommit}
+        setSelectedCommit={git.setselectedCommit}>
         <TopActionBar
           onPush={git.push}
           onPull={git.pull}
@@ -42,7 +44,7 @@ const GitManager = () => {
       </TabNav>
 
       {/* 메인 컨텐츠 */}
-      <main className="flex-1 h-fit">
+      <main className="flex-1 min-h-[600px] h-fit overflow-y-auto">
         {git.tab === "history" && (
           <CommitHistoryPanel
             commits={git.commits}
@@ -60,21 +62,21 @@ const GitManager = () => {
             setCurrentBranchTipHash={git.setCurrentBranchTipHash}
             currentBranchTipHash={git.currentBranchTipHash}
             commitFiles={git.commitFiles}
-            setCommitFiles={git.setCommitFiles}            
+            setCommitFiles={git.setCommitFiles}
             onCommitFiles={git.onCommitFiles}
             onCommitFileDiff={git.onCommitFileDiff}
             setTab={git.setTab}
           />
         )}
         {git.tab === "commitview" && (
-          <CommitViewPanel 
-          selectedCommit={git.selectedCommit} 
-          commitFiles={git.commitFiles}
-          onCommitFileDiff={git.onCommitFileDiff}                              
-          setCommitFiles={git.setCommitFiles}          
+          <CommitViewPanel
+            selectedCommit={git.selectedCommit}
+            commitFiles={git.commitFiles}
+            onCommitFileDiff={git.onCommitFileDiff}
+            setCommitFiles={git.setCommitFiles}
           />
         )}
-        
+
         {git.tab === "remotes" && (
           <RemotesPanel
             remotes={git.remotes}
@@ -109,15 +111,13 @@ const GitManager = () => {
             handleToggleLine={git.handleToggleLine}
           />
         )}
-        {/* {git.tab === "branches" && (
+        {git.tab === "branches" && (
           <BranchesPanel
-            local={git.localBranches}
-            remotes={git.remoteBranches}
-            tracking={git.trackingBranches}
-            onCheckout={git.checkoutBranch}
+            onCheckoutLocal={git.selecteLocalBranch}
+            onCheckoutRemote={git.selectRemoteBranch}
             onDelete={git.deleteBranch}
           />
-        )} */}
+        )}
         {git.tab === "stash" && (
           <StashPanel
             stashes={git.stashes}

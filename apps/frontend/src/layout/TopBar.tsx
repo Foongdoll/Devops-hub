@@ -11,6 +11,7 @@ interface TopBarProps {
 const getTitle = (pathname: string) => {  
   if (pathname.startsWith('/terminals')) return '터미널';
   if (pathname.startsWith('/git')) return 'Git 관리';
+  if (pathname.startsWith('/cicd')) return 'CICD 관리';
   return '대시보드';
 };
 

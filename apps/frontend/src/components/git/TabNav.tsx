@@ -36,14 +36,17 @@ const TabNav: React.FC<TabNavProps> = ({
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
 
   return (
-    <nav className="
-      flex items-center justify-between px-6 py-2
-      rounded-t-2xl shadow-md
-      bg-gradient-to-r from-[#ede9fe] via-[#e8defa] to-[#d1c4ff]
-      border-b border-[#e1dbfa]
-      select-none
-    ">
-      <div className="flex gap-1">
+    <nav
+      className="
+    flex flex-wrap items-center justify-between px-2 md:px-6 py-2
+    rounded-t-2xl shadow-md
+    bg-gradient-to-r from-[#ede9fe] via-[#e8defa] to-[#d1c4ff]
+    border-b border-[#e1dbfa]
+    select-none
+    min-w-0
+  "
+    >
+      <div className="flex flex-wrap gap-1 min-w-0 max-w-full">
         {tabs.map((tab, i) => {
           const isActive = active === tab.key;
           const isHover = hoverIdx === i;
@@ -90,7 +93,8 @@ const TabNav: React.FC<TabNavProps> = ({
               >
                 {tab.icon}
               </motion.span>
-              <span className="hidden md:inline">{tab.label}</span>
+              {/* 반응형: 1265px 이하에서 label(글씨) 숨기기 */}
+              <span className="hidden xl:inline">{tab.label}</span>
               {tab.key === 'changes' && changesCount > 0 && (
                 <span className="
                   ml-1 inline-block
@@ -106,7 +110,14 @@ const TabNav: React.FC<TabNavProps> = ({
           );
         })}
       </div>
-      <div className="flex gap-2 items-center">{children}</div>
+      <div
+        className="
+      flex flex-wrap gap-2 items-center min-w-0 max-w-full
+      mt-2 md:mt-0
+    "
+      >
+        {children}
+      </div>
     </nav>
   );
 };

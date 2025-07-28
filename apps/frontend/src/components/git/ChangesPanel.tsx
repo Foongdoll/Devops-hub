@@ -6,6 +6,7 @@ import { useRemoteContext } from '../../context/RemoteContext';
 import type { Remote } from '../../customhook/git/useRemote';
 import { TopStageBar } from './GitBranchBar';
 import { Tooltip } from 'react-tooltip';
+import 'react-tooltip/dist/react-tooltip.css';
 import { useGitSocket } from '../../context/GitSocketContext';
 
 export interface ChangesPanelProps {
@@ -96,6 +97,11 @@ const ChangesPanel: React.FC<ChangesPanelProps> = ({
   return (
     <section className="flex flex-col md:flex-row h-[calc(100vh-220px)] gap-6 px-6 py-6">
       {/* Left: Staged/Unstaged */}
+      <Tooltip
+        id="global-tooltip"
+        place="top"
+        style={{ zIndex: 9999, fontSize: 16, maxWidth: 600 }}
+      />
       <div className="w-full md:w-1/3 flex flex-col gap-4">
         <TopStageBar
           localBranches={localBranches}
@@ -106,6 +112,8 @@ const ChangesPanel: React.FC<ChangesPanelProps> = ({
           onSelectRemoteBranch={onSelectRemoteBranch}
           selectedRemote={selectedRemote || { name: '', url: '' } as Remote}
         />
+
+        {/* ✅ Staged Files */}
         <div className="bg-gray-800 rounded-2xl shadow p-3 flex-1 flex flex-col overflow-y-auto">
           <div className="font-semibold text-gray-300 mb-2 justify-between flex items-center">
             <span>Staged Files ({stagedFiles.length})</span>
@@ -113,48 +121,45 @@ const ChangesPanel: React.FC<ChangesPanelProps> = ({
               <button onClick={() => onToggleStageFiles(false)}><Repeat /></button>
             </span>
           </div>
-          <ul className="flex-1 space-y-1 overflow-y-auto o">
+          <ul className="flex-1 space-y-1 overflow-y-auto overflow-x-hidden">
             <AnimatePresence>
               {stagedFiles.map(f => (
                 <motion.li
                   key={f.path}
                   variants={liVariants}
                   initial="initial"
-                  // animate="animate"
                   exit="exitRight"
                   whileHover="hover"
                   whileTap="tap"
                   transition={{ layout: { duration: 0.19, type: "spring" } }}
                   layout
-                  data-tooltip-id={`file-name-tooltip-${f.path}`}
-                  data-tooltip-content={f.name}
                   className="flex h-[34px] items-center justify-between bg-[#22173b] group rounded-xl px-4 py-3 hover:bg-indigo-900/80 transition shadow-sm cursor-pointer truncate relative"
                   onClick={() => selectedRemote && onSelectFile(f, selectedRemote)}
-                  // exit 애니메이션 트리거: exitingStaged에 포함된 파일만 exit
                   animate={exitingStaged.includes(f.path) ? "exitRight" : "animate"}
                   onAnimationComplete={definition => {
-                    // exitRight가 끝나면!
                     if (exitingStaged.includes(f.path) && definition === "exitRight") {
                       handleStagedExitComplete(f);
                     }
                   }}
                 >
-                  <div className="flex items-center gap-2 min-w-0">
+                  <div
+                    className="flex items-center gap-2 min-w-0"
+                    data-tooltip-id="global-tooltip"
+                    data-tooltip-content={f.name}
+                  >
                     {f.status === "??" ? (
                       <FileQuestion className="w-4 h-4 text-gray-400 flex-shrink-0" />
                     ) : (
                       <FileText className="w-4 h-4 text-gray-400 flex-shrink-0" />
                     )}
-                    <span className="text-gray-200 max-w-[240px] truncate block font-semibold tracking-tight">{f.name}</span>
-                    <Tooltip
-                      id={`file-name-tooltip-${f.path}`}
-                      place="top"
-                      style={{ zIndex: 9999, fontSize: 16, maxWidth: 600 }}
-                    />
+                    <span className="text-gray-200 max-w-[240px] truncate block font-semibold tracking-tight">
+                      {f.name}
+                    </span>
                   </div>
+
                   <motion.button
                     whileHover={{ x: 3, scale: 1.18, backgroundColor: "#ba2d6580" }}
-                    whileTap={{ scale: 0.9, opacity: 0.7 }}
+                    whileTap={{ scale: 0.9,}}
                     onClick={e => {
                       e.stopPropagation();
                       handleStagedRemove(f);
@@ -171,6 +176,7 @@ const ChangesPanel: React.FC<ChangesPanelProps> = ({
           </ul>
         </div>
 
+        {/* ✅ Unstaged Files */}
         <div className="bg-gray-800 rounded-2xl shadow p-3 flex-1 flex flex-col overflow-y-auto">
           <div className="font-semibold text-gray-300 mb-2 justify-between flex items-center">
             <span>Unstaged Files ({unstagedFiles.length})</span>
@@ -178,7 +184,7 @@ const ChangesPanel: React.FC<ChangesPanelProps> = ({
               <button onClick={() => onToggleStageFiles(true)}><Repeat /></button>
             </span>
           </div>
-          <ul className="flex-1 space-y-1 overflow-y-auto">
+          <ul className="flex-1 space-y-1 overflow-y-auto overflow-x-hidden">
             <AnimatePresence>
               {unstagedFiles.map(f => (
                 <motion.li
@@ -190,8 +196,6 @@ const ChangesPanel: React.FC<ChangesPanelProps> = ({
                   whileTap="tap"
                   transition={{ layout: { duration: 0.19, type: "spring" } }}
                   layout
-                  data-tooltip-id={`file-name-tooltip-${f.path}`}
-                  data-tooltip-content={f.name}
                   className="flex h-[34px] items-center justify-between bg-[#17282c] group rounded-xl px-4 py-3 hover:bg-teal-900/70 transition shadow-sm cursor-pointer truncate relative"
                   onClick={() => selectedRemote && onSelectFile(f, selectedRemote)}
                   animate={exitingUnstaged.includes(f.path) ? "exitLeft" : "animate"}
@@ -201,22 +205,24 @@ const ChangesPanel: React.FC<ChangesPanelProps> = ({
                     }
                   }}
                 >
-                  <div className="flex items-center gap-2 min-w-0">
+                  <div
+                    className="flex items-center gap-2 min-w-0"
+                    data-tooltip-id="global-tooltip"
+                    data-tooltip-content={f.name}
+                  >
                     {f.status === "??" ? (
                       <FileQuestion className="w-4 h-4 text-gray-400 flex-shrink-0" />
                     ) : (
                       <FileText className="w-4 h-4 text-gray-400 flex-shrink-0" />
                     )}
-                    <span className="text-gray-200 max-w-[240px] truncate block font-semibold tracking-tight">{f.name}</span>
-                    <Tooltip
-                      id={`file-name-tooltip-${f.path}`}
-                      place="top"
-                      style={{ zIndex: 9999, fontSize: 16, maxWidth: 600 }}
-                    />
+                    <span className="text-gray-200 max-w-[240px] truncate block font-semibold tracking-tight">
+                      {f.name}
+                    </span>
                   </div>
+
                   <motion.button
                     whileHover={{ x: -3, scale: 1.16, backgroundColor: "#22fba055" }}
-                    whileTap={{ scale: 0.9, opacity: 0.7 }}
+                    whileTap={{ scale: 0.9, }}
                     onClick={e => {
                       e.stopPropagation();
                       handleUnstagedAdd(f);

@@ -19,7 +19,7 @@ interface SidebarProps {
 
 const mainMenus = [
   { icon: <Home />, label: '대시보드', path: '/' },
-  { icon: <Server />, label: '서버 관리', path: '/servers' },
+  { icon: <Server />, label: 'CI/CD 관리', path: '/cicd' },
   { icon: <Terminal />, label: 'SSH 접속', path: '/terminals' },
   { icon: <GitBranch />, label: 'Git 저장소', path: '/git' },
   { icon: <Cloud />, label: 'S3 & 파일 관리', path: '/storage' },
@@ -93,6 +93,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             return (
               <motion.div
                 className="overflow-hidden"
+                key={path+icon+label}
                 whileHover={{
                   scale: 1.03,
                   x: 8,

@@ -19,7 +19,7 @@ export interface Commit {
   branches?: string[];  // 파싱된 브랜치명 리스트
 }
 
-export interface Branch { name: string; current?: boolean; fullname?: string };
+export interface Branch { name: string; current?: boolean; fullname?: string, upstream?: string };
 export interface TrackingBranch { local: string; remote: string; ahead?: number; behind?: number };
 export interface Stash { name: string; message: string; files: File[] };
 export interface Remote { id: string; name: string; url: string; path: string };

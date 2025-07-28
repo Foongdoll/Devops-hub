@@ -5,7 +5,7 @@ import { useRemoteContext } from '../../context/RemoteContext';
 import { useGitSocket } from '../../context/GitSocketContext';
 import { showToast } from '../../utils/notifyStore';
 import type { File } from './useChanges';
-export type Branch = { name: string; current?: boolean; fullname?: string };
+export type Branch = { name: string; current?: boolean; fullname?: string, upstream?: string };
 export type TrackingBranch = { local: string; remote: string; ahead?: number; behind?: number };
 
 export function useBranches() {
@@ -13,17 +13,17 @@ export function useBranches() {
   const { emit, on, off } = useGitSocket();
   const [conflictFiles, setConflictFiles] = useState<File[]>([]);
   const [conflictBranch, setConflictBranch] = useState<string>('');
-  
+
 
   const fetchBranches = useCallback(async (remote: Remote) => {
     const result = await fetchBranchesImpl(remote) as { local: Branch[], remote: Branch[], tracking: TrackingBranch[] };
-    if (!result) return false;
+    if (!result) return false;    
 
     setLocalBranches(result.local);
     setRemoteBranches(result.remote);
     setSelectedLocalBranch(result.local.find(b => b.current)?.name || '');
     setSelectedRemoteBranch(result.remote.find(b => b.current)?.name || '');
-    emit('connect_git', { remote: remote })        
+    emit('connect_git', { remote: remote })
     emit('fetch_changed_files', { remote: remote });
     emit('fetch_commit_count', { remote: remote, remoteBranch: result.remote.find(b => b.current)?.name || '' });
     emit('fetch_pull_request_count', { remote: remote, remoteBranch: result.remote.find(b => b.current)?.name || '' });
@@ -45,7 +45,7 @@ export function useBranches() {
     // if (!result[0] || !result[1]) return;
     if (!remote) return;
 
-    emit('checkout_local_branch', { branch, selectedRemoteBranch: '', remote });    
+    emit('checkout_local_branch', { branch, selectedRemoteBranch: '', remote });
   }, []);
 
   const selectRemoteBranch = useCallback((branch: string) => {
@@ -53,9 +53,13 @@ export function useBranches() {
     setSelectedRemoteBranch(branch);
   }, [selectedRemote]);
 
+  const deleteBranch = useCallback((remote: Remote, branch: Branch) => {
+    
+  }, [])
+
 
   useEffect(() => {
-    on('checkout_local_branch_response', (data: { success: boolean; message: string, branch: string, conflictFiles: File[], remote? : Remote}) => {      
+    on('checkout_local_branch_response', (data: { success: boolean; message: string, branch: string, conflictFiles: File[], remote?: Remote }) => {
       if (data.success) {
         showToast('로컬 브랜치 변경 성공', 'success');
         setSelectedLocalBranch(data.branch);
@@ -64,8 +68,8 @@ export function useBranches() {
         showToast(`${data.message}`, 'error');
         if (data.conflictFiles.length > 0) {
           setConflictFiles(data.conflictFiles);
-          setConflictModalOpen(true);        
-          setConflictBranch(data.branch);  
+          setConflictModalOpen(true);
+          setConflictBranch(data.branch);
         }
       }
     })
@@ -81,6 +85,7 @@ export function useBranches() {
     fetchBranches,
     selecteLocalBranch,
     selectRemoteBranch,
+    deleteBranch,
 
     // 충돌 관련
     conflictFiles,

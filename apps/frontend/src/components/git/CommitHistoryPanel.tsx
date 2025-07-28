@@ -238,7 +238,7 @@ export const CommitHistoryPanel: React.FC<CommitHistoryPanelProps> = ({
   }, [contextMenu]);
 
   return (
-    <section className="bg-gradient-to-b from-[#20213a] via-[#22234b] to-[#292a3e] p-4 rounded-2xl shadow-xl flex flex-col gap-4 h-full w-full overflow-auto border border-[#36366d]">
+    <section className="p-4 rounded-2xl shadow-xl flex flex-col gap-4 h-full w-full border border-[#36366d]">
       <TopStageBar
         localBranches={localBranches}
         remoteBranches={remoteBranches}
