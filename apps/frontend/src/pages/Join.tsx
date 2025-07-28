@@ -1,11 +1,14 @@
 import { useNavigate } from "react-router-dom";
 import { useJoin } from "../customhook/useJoin";
-import { motion } from "framer-motion";
+import { motion, number } from "framer-motion";
 import React, { useEffect, useRef } from "react";
-
+type CircleType = {
+  key: number;
+  style: React.CSSProperties; // 또는 style 구조에 맞는 타입 명시
+};
 // (1) 로그인에서 사용한 AnimatedCircles 재사용 (공통 파일로 분리해도 됨!)
-const AnimatedCircles = React.memo(function AnimatedCircles({ count = 10 }) {
-  const circlesRef = useRef(null);
+const AnimatedCircles = React.memo(function AnimatedCircles({ count = 10 }: { count: number }) {
+  const circlesRef = useRef<CircleType[]>([]);
 
   if (!circlesRef.current) {
     const colorArr = [
