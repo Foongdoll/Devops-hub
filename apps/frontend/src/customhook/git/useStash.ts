@@ -24,10 +24,10 @@ export function useStash(initial: Stash[] = []) {
     if (!remote || !stash) return;
     showLoading({ message: "스태시 적용 중..." });
     const res = await applyStashImpl(remote, stash.name);
-    if (res) {      
+    if (res) {
       setStashes(prev => prev.filter(s => s.name !== stash.name));
       setSelectedStash(null); setStashFiles([]); setSelectedStashFile(null); setStashDiff('');
-    } 
+    }
     await delay(1000);
     hideLoading();
   }, []);
@@ -35,7 +35,7 @@ export function useStash(initial: Stash[] = []) {
     if (!remote || !stash) return;
     showLoading({ message: "스태시 적용 중..." });
     const res = await dropStashImpl(remote, stash.name);
-    if (res) {      
+    if (res) {
       setStashes(prev => prev.filter(s => s.name !== stash.name));
       if (selectedStash?.name === stash.name) {
         setSelectedStash(null); setStashFiles([]); setSelectedStashFile(null); setStashDiff('');
@@ -85,7 +85,7 @@ export function useStash(initial: Stash[] = []) {
   useEffect(() => {
 
     // 변경 파일 리스트 조회
-    on('fetch_stash_changed_files_response', (data: { resultFiles: File[], discard?: boolean }) => {      
+    on('fetch_stash_changed_files_response', (data: { resultFiles: File[], discard?: boolean }) => {
       if (data.resultFiles) {
         const res = data.resultFiles.filter(v => !v.staged);
         setStashChangedFiles(res);
@@ -124,7 +124,7 @@ export function useStash(initial: Stash[] = []) {
   const fetchStashFileDiff = useCallback((remote: Remote | null, selectedStash: Stash | null, file: File) => {
 
     if (selectedStash) {
-      emit('fetch_file_diff', { remote, filePath: file.path, fileStaged: false })
+      emit('fetch_stash_file_diff', { remote, filePath: file.path, stash: selectedStash })
     }
     setSelectedStashFile(file);
   }, [selectedStash]);
@@ -148,14 +148,21 @@ export function useStash(initial: Stash[] = []) {
       }
     };
 
-    on('fetch_file_diff_response', (diff: string) => {
-      setStashDiff(diff);
+    on('fetch_stash_file_diff_response', (data: { diff: string }) => {
+      const { diff } = data;
+      console.log(data);
+      if (diff.trim() === "") {
+        showToast("변경 사항을 불러오지 못했습니다.\n새로고침 후 다시 진행부탁드립니다.", "error");
+      } else {
+        setStashDiff(diff);
+      }
+
     });
 
     on('git_stash_push_response', handleStashPushResponse);
     return () => {
       off('git_stash_push_response', handleStashPushResponse);
-      off('fetch_file_diff_response');
+      off('fetch_stash_file_diff_response');
     };
   }, [on, off]);
 

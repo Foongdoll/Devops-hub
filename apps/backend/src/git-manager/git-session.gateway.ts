@@ -14,7 +14,7 @@ import { promisify } from 'util';
 import { exec, execFile } from 'child_process';
 import { promises as fs } from 'fs';
 import { JwtTokenService } from 'src/auth/jwt.service';
-import { Branch, Commit, fetch_commit_history, File } from 'src/common/type/git.interface';
+import { Branch, Commit, fetch_commit_history, File, Stash } from 'src/common/type/git.interface';
 import { Remote } from './entity/remote.entity';
 import { ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import path from 'path';
@@ -296,7 +296,6 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
     @ConnectedSocket() socket: Socket
   ) {
     try {
-
       const cmd = [
         "-C", remote.path,
         "diff",
@@ -433,7 +432,7 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
 
   /**
    * commit 개수 조회
-   * @param data Remote remoteBranch
+   * @param {Remote remoteBranch}
    * @Description
    * remoteBranch의 커밋 개수를 조회합니다.
    */
@@ -496,7 +495,7 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
 
   /**
    * pull request 개수 조회
-   * @param data Remote remoteBranch
+   * @param {Remote remoteBranch}
    * @Description
    * remoteBranch의 pull request 개수를 조회합니다.
    */
@@ -557,7 +556,7 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
 
   /**
    * 로컬 브랜치 checkout
-   * @param data branch remote
+   * @param {branch remote}
    * @Description
    * 로컬 브랜치를 checkout 합니다.
   */
@@ -647,7 +646,7 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
   }
 
   /**
-   * @param data { branch: string, remote: Remote }
+   * @param { branch: string, remote: Remote }
    * @description 원격 브랜치 체크아웃
    */
   @SubscribeMessage('checkout_remote_branch')
@@ -674,7 +673,7 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
   }
 
   /**
-   * @param data { remote: Remote }
+   * @param { remote: Remote }
    * @description 로컬, 리모트 브랜치 전달
   */
   @SubscribeMessage('git_get_branches')
@@ -721,7 +720,7 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
 
 
   /** 
-    @param data { remote: Remote, filePath: string }
+    @param { remote: Remote, filePath: string }
     @description 변경 사항 전체 버리기
   */
   @SubscribeMessage('discard_all')
@@ -917,12 +916,12 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
       if (staged) {
         const untrackingArgs = ['-C', remote.path, 'ls-files', '--others', '--exclude-standard']
         const { stdout: untrackedStdout } = await execFileAsync('git', untrackingArgs);
-        
-        const arr = untrackedStdout.split("\n");      
-        for(const path of arr) {
-          if(path.trim() === "") continue;
-          await execFileAsync('git', ['-C', remote.path, 'add', '--', remote.path+"/"+path]);
-        }        
+
+        const arr = untrackedStdout.split("\n");
+        for (const path of arr) {
+          if (path.trim() === "") continue;
+          await execFileAsync('git', ['-C', remote.path, 'add', '--', remote.path + "/" + path]);
+        }
       }
 
 
@@ -937,7 +936,7 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
         staged: staged,
       });
     } catch (error: any) {
-      
+
       sock.emit('git_stage_unstage_toggle_response', {
         success: false,
         message: error?.message ?? 'Stage/Unstage toggle failed',
@@ -947,7 +946,7 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
   }
 
   /**
-    @param data { remote: Remote }
+    @param { remote: Remote }
     @description Head 브랜치 tip hash 조회
   */
   @SubscribeMessage('fetch_head_branch_tip')
@@ -974,7 +973,7 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
 
 
   /**
-   * @param data { remote: Remote, hash: string }
+   * @param { remote: Remote, hash: string }
    * @description 커밋 해시로 체크아웃
    */
   @SubscribeMessage('git_checkout_commit')
@@ -1137,7 +1136,8 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
 
 
   /**
-    @param remote: Remote, commit: Commit, filePath: string  
+   * @param {remote: Remote, commit: Commit, filePath: string }
+   * @description 특정(specific) 커밋 내역 내 선택한 파일의 변경 사항 조회
   */
   @SubscribeMessage('fetch_commit_files_diff')
   async handleFetchCommitFilesDiff(
@@ -1164,4 +1164,36 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
       });
     }
   }
+
+
+
+  /**
+   * @param {remote: Remote, filePath: string, stash: Stash}
+   * @description 스태시 내 특정 파일 변경 내용 조회
+  */
+  @SubscribeMessage("fetch_stash_file_diff")
+  async handleFetchStashFilesDiff(
+    @MessageBody() data: { remote: Remote, filePath: string, stash: Stash },
+    @ConnectedSocket() sock: Socket
+  ) {
+    try {
+      const { remote, filePath, stash } = data;
+
+      const args = ['-C', remote.path, 'diff', `${stash.name}^1`, stash.name, '--', `${filePath}`]
+      console.log(args);
+      const { stdout } = await execFileAsync('git', args);
+
+      console.log(stdout);
+      this.logger.log('특정 보관함의 선택된 파일의 변경 내역 조회 완료');      
+      sock.emit('fetch_stash_file_diff_response', { diff: stdout })
+    } catch (error) {
+      this.logger.error('특정 보관함의 선택된 파일의 변경 내역 조회 실패');
+      this.logger.error(error);
+      sock.emit('fetch_stash_file_diff_response', { diff: "" })
+    }
+
+  }
+
+
+
 }
