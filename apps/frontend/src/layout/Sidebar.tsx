@@ -28,7 +28,6 @@ const mainMenus = [
 
 const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const { pathname } = useLocation();
-  const { theme, toggleTheme } = useTheme();
 
   return (
     <>
@@ -93,12 +92,12 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             const active = pathname === path;
             return (
               <motion.div
-                key={path}
+                className="overflow-hidden"
                 whileHover={{
                   scale: 1.03,
                   x: 8,
-                  backgroundColor: "#f6f1fe",
                   boxShadow: "0 2px 18px #b3c1f744"
+                  // backgroundColor 삭제!
                 }}
                 transition={{ type: "spring", stiffness: 140, damping: 12 }}
               >
@@ -106,11 +105,12 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                   to={path}
                   onClick={onClose}
                   className={`
-                    flex items-center px-4 py-2 rounded-l-full font-semibold transition
-                    ${active
-                      ? 'bg-white text-[#7e4cff] shadow'
-                      : 'text-[#7c3aed] hover:bg-[#f3e8ff]'}
-                  `}
+                          flex items-center px-4 py-2 font-semibold transition
+                          ${active
+                                  ? 'bg-white text-[#7e4cff] shadow'
+                                  : 'text-[#7c3aed] hover:bg-[#f3e8ff]'}
+                          rounded-xl
+                        `}
                   style={{
                     fontWeight: 600,
                     letterSpacing: "0.04em"
@@ -120,6 +120,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                   {label}
                 </Link>
               </motion.div>
+
             );
           })}
         </nav>
