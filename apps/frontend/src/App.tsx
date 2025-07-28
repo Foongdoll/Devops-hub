@@ -12,6 +12,8 @@ import { ThemeProvider } from './context/ThemeProvider';
 import { GitSocketProvider, useGitSocket } from './context/GitSocketContext';
 import { RemoteProvider } from './context/RemoteContext';
 import CustomTitleBar from './components/electron/CustomTitleBar';
+import { CICDManager } from './pages/CICDManger';
+import { CICDSocketProvider } from './context/CICDSocketContext';
 
 const RequireAuth = ({ children }: { children: React.ReactNode }) => {
   const isAuthed = React.useMemo(() => !!localStorage.getItem('accessToken'), []);
@@ -45,7 +47,7 @@ const SocketCheck = () => {
 
 const App = () => (
   <ThemeProvider>
-    {isElectron() && (<CustomTitleBar />) }
+    {isElectron() && (<CustomTitleBar />)}
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<Login />} />
@@ -72,6 +74,11 @@ const App = () => (
             <RemoteProvider>
               <GitManager />
             </RemoteProvider>
+          } />
+          <Route path='cicd' element={
+            <CICDSocketProvider>
+              <CICDManager />
+            </CICDSocketProvider>
           } />
           {/* 추가로 /settings, /git 등도 이 아래에 계속 추가 */}
         </Route>

@@ -12,6 +12,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { TerminalModule } from './terminal/terminal.module';
 import { GitManagerModule } from './git-manager/git-manager.module';
 import { GitGateway } from './git-manager/git-session.gateway';
+import { CicdModule } from './cicd/cicd.module';
 
 @Module({
   imports: [
@@ -41,7 +42,8 @@ import { GitGateway } from './git-manager/git-session.gateway';
     GlobalConfigModule,
     AuthModule,
     TerminalModule,
-    GitManagerModule
+    GitManagerModule,
+    CicdModule
   ],
   controllers: [],
   providers: [
