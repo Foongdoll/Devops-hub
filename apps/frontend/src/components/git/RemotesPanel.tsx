@@ -97,7 +97,8 @@ const RemotesPanel: React.FC<RemotesPanelProps> = ({
                 className="flex-1 px-3 py-2 rounded-lg bg-white text-[#5a5799] border border-[#ecebff] focus:outline-none"
                 placeholder="로컬 폴더 경로"
                 value={form.path}
-                disabled={true}
+                onChange={e => setForm(f => ({ ...f, path: e.target.value }))}
+                // disabled={}
               />
               <button
                 type="button"

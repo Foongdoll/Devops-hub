@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Settings, LayoutDashboard } from "lucide-react";
+import { Settings, LayoutDashboard, Wrench } from "lucide-react";
 import type { CicdTab } from "../../customhook/cicd/useCICD";
 import type { JSX } from "react";
 
@@ -8,11 +8,12 @@ interface CicdNavProp {
   setTab: (tab: CicdTab) => void;
 }
 
+
 const tabs: { key: CicdTab; label: string; icon: JSX.Element }[] = [
   { key: "main", label: "Main", icon: <LayoutDashboard size={16} /> },
   { key: "manage", label: "Manage", icon: <Settings size={16} /> },
+  { key: "config", label: "Config", icon: <Wrench size={16}  /> }, // key/label 전부 새롭게
 ];
-
 export const CicdNav: React.FC<CicdNavProp> = ({ tab, setTab }) => {
   return (
     <div className="w-full px-4 py-2 bg-gradient-to-r from-[#e2ccff] to-[#c193ff] rounded-xl shadow-inner">
@@ -28,10 +29,9 @@ export const CicdNav: React.FC<CicdNavProp> = ({ tab, setTab }) => {
               <button
                 onClick={() => setTab(key)}
                 className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-all
-                  ${
-                    isActive
-                      ? "bg-white text-purple-700 shadow-md"
-                      : "text-white/90 hover:bg-white/20"
+                  ${isActive
+                    ? "bg-white text-purple-700 shadow-md"
+                    : "text-white/90 hover:bg-white/20"
                   }`}
               >
                 <motion.span

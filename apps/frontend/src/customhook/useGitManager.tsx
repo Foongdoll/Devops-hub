@@ -36,7 +36,7 @@ export const useGitManager = () => {
 
     const git_notify = (data: { message: string, type: string, remote: Remote }) => {
       showToast(data.message, 'info');
-
+            
       switch (data.type) {
         case 'pull':
 

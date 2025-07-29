@@ -8,11 +8,13 @@ import { AuthModule } from 'src/auth/auth.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { CicdConfigEntity } from './entity/cicd-config.entity';
 import { Session } from 'src/terminal/entities/session.entity';
+import { TerminalService } from 'src/terminal/terminal.service';
+import { TerminalModule } from 'src/terminal/terminal.module';
 
 @Module({
   imports: [AuthModule, TypeOrmModule.forFeature([CicdConfigEntity, Session])],
   exports: [CicdGateway],
   controllers: [CicdController],
-  providers: [CicdService, CicdGateway],
+  providers: [CicdService, CicdGateway, TerminalService],
 })
 export class CicdModule {}

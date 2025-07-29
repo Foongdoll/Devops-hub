@@ -10,6 +10,7 @@ import { UserType } from 'src/common/decorator/user.decorator';
 import { AddRemoteDto } from './dto/addRemote.dto';
 import { v4 as uuid } from 'uuid';
 import { Branch, File, Stash } from 'src/common/type/git.interface';
+import path from 'path';
 const execFileAsync = promisify(execFile);
 
 @Injectable()
@@ -36,7 +37,9 @@ export class GitManagerService {
   */
   async addRemote(remote: AddRemoteDto, user: UserType): Promise<ApiResponse> {
     try {
-      const isGit = fs.existsSync(remote.path.replace(/\\/g, '/'));
+
+      const gitFolder = path.join(remote.path.replace(/\\/g, '/'), '.git');
+      const isGit = fs.existsSync(gitFolder);
       const remoteEntity = new Remote();
       remoteEntity.id = uuid();
       remoteEntity.name = remote.name;
@@ -47,6 +50,10 @@ export class GitManagerService {
         userCd: user.sub,
         remoteId: remoteEntity.id
       });
+
+      console.log("---------------------------------------");
+
+      console.log(isGit);
 
       // 경로가 존재하지 않으면 디렉토리 생성
       if (!isGit) {

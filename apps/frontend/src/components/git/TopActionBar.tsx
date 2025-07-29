@@ -13,7 +13,7 @@ export type TopActionBarProps = {
   onPush: (remote: Remote | null, remoteBranch: string) => void;
   onPull: (remote: Remote | null, remoteBranch: string) => void;
   onFetch: (remote: Remote | null) => void;
-  onReset: (remote: Remote | null, option: string, commits: string[]) => void;
+  onReset: (remote: Remote | null, option: string, commits: string[], remoteBranch: string) => void;
   setTab: Dispatch<SetStateAction<tabType>>;
 };
 
@@ -62,7 +62,7 @@ const TopActionBar: React.FC<TopActionBarProps> = ({
       }
 
       const [ok, option] = await showConfirm("Reset", "리셋 옵션을 선택해주세요.", { select: true, data: ["soft", "mixed", "hard"] });
-      if (!ok) return; // cancel
+      if (!ok || !option) return;
       else {
         // 각 옵션에 따라 경고 분기
         if (option === "soft") {
@@ -88,9 +88,11 @@ const TopActionBar: React.FC<TopActionBarProps> = ({
           );
           if (!confirmOk) return;
         }
+
+        showToast("Reset을 진행합니다.", "info");
+        onReset(selectedRemote, option, selectedCommits, selectedRemoteBranch);
       }
-      showToast("Reset을 진행합니다.", "info");
-      onReset(selectedRemote, option, selectedCommits);
+
     }
 
 

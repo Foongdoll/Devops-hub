@@ -43,4 +43,7 @@ export class Session {
   })
   osType: OSType;
 
+  @Column()
+  userCd: string;
+
 }

@@ -70,6 +70,15 @@ export function GlobalUIProvider({ children }: { children: ReactNode }) {
     return unsubscribe;
   }, []);
 
+  useEffect(() => {
+    if (confirmState.options?.select && Array.isArray(confirmState.options?.data)) {
+      setData(confirmState.options.data[0]);
+    } else {
+      setData(null);
+    }
+    setCheckbox(confirmState.options?.checkbox?.value ?? false);
+  }, [confirmState.options]);
+
 
   const showConfirm = (message: string, description?: string, options?: ConfirmOptions) => {
     return new Promise<[boolean, any]>(resolve => {
@@ -178,6 +187,7 @@ export function GlobalUIProvider({ children }: { children: ReactNode }) {
               {confirmState.options?.select && (
                 <select
                   className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm"
+                  value={data ?? ""}  // value에 data 직접 바인딩!
                   onChange={(e) => setData(e.target.value)}
                 >
                   <option value="">선택하세요</option>

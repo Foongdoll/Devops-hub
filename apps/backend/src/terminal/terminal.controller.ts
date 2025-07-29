@@ -6,6 +6,7 @@ import { JwtAuthGuard } from 'src/auth/guard/jwt-auth.guard';
 import { RoleGuard } from 'src/auth/guard/role.guard';
 import { Roles } from 'src/common/decorator/rols.decorator';
 import { ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import { User } from 'src/common/decorator/user.decorator';
 
 @UseGuards(JwtAuthGuard, RoleGuard)
 @Roles('USER')
@@ -16,8 +17,8 @@ export class TerminalController {
 
   @Get('getSessions')
   @ApiOperation({ summary: '세션 목록 조회', description: '사용자의 세션 목록을 조회합니다.', parameters: [] })
-  async list(): Promise<ApiResponse> {
-    return await this.svc.findAll();
+  async list(@User() user): Promise<ApiResponse> {
+    return await this.svc.findAll(user);
   }
 
   @Get('getSessions/:id')

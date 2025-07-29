@@ -5,6 +5,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Session } from './entities/session.entity';
 import { Repository } from 'typeorm';
 import { ApiResponse } from 'src/common/dto/response.dto';
+import { UserType } from 'src/common/decorator/user.decorator';
 
 @Injectable()
 export class TerminalService {
@@ -13,8 +14,8 @@ export class TerminalService {
     private readonly repo: Repository<Session>,
   ) { }
 
-  async findAll() {
-    return ApiResponse.success(await this.repo.find(), '세션 목록을 불러왔습니다.');
+  async findAll(user: UserType) {
+    return ApiResponse.success(await this.repo.find({ where: { userCd: user.sub } }), '세션 목록을 불러왔습니다.');
   }
 
   async findOne(id: string) {

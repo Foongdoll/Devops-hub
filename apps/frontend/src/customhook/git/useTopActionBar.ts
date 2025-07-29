@@ -21,11 +21,12 @@ export function useTopActionBar() {
   const fetch = useCallback((remote: Remote | null) => {
     emit("git_fetch", { remote });
   }, []);
-  const reset = useCallback((remote: Remote | null, option: string, commits: string[]) => {
+  const reset = useCallback((remote: Remote | null, option: string, commits: string[], remoteBranch: string) => {
     emit('git_reset', {
       remote: remote,
       option, // soft | mixed | hard
       commits,
+      remoteBranch
     });
   }, []);
 
@@ -63,12 +64,16 @@ export function useTopActionBar() {
 
     const git_reset_response = (response: {
       success: boolean,
-      message: string
+      message: string,
+      remoteBranch: string,
     }) => {
+
+      console.log(response);
       showToast(response.message, response.success ? "success" : "error");
       if (response.success) {
         emit("fetch_changed_files", { remote: selectedRemote });
-        emit("fetch_change_count", { remote: selectedRemote })
+        emit("fetch_change_count", { remote: selectedRemote });
+        emit("fetch_commit_count", { remote: selectedRemote, remoteBranch: response.remoteBranch })
       }
 
     }

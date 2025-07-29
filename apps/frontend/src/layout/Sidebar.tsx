@@ -22,8 +22,8 @@ const mainMenus = [
   { icon: <Server />, label: 'CI/CD 관리', path: '/cicd' },
   { icon: <Terminal />, label: 'SSH 접속', path: '/terminals' },
   { icon: <GitBranch />, label: 'Git 저장소', path: '/git' },
-  { icon: <Cloud />, label: 'S3 & 파일 관리', path: '/storage' },
-  { icon: <Settings />, label: '설정', path: '/settings' },
+  // { icon: <Cloud />, label: 'S3 & 파일 관리', path: '/storage' },
+  // { icon: <Settings />, label: '설정', path: '/settings' },
 ];
 
 const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {

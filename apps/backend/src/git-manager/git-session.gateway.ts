@@ -76,7 +76,12 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
   // 같은 리모트 사용중인 회원에게 메시지 전송
   private notifyAll(remote: Remote, message: string, type: 'pull' | 'push' | 'commit') {
     const sockets = this.gitClients.get(remote.id) || [];
+    
+    console.log(sockets.length);
     sockets.forEach(socket => {
+      console.log(socket.id);
+
+
       socket.emit('git_notify', { message, type, remote });
     });
   }
@@ -122,13 +127,16 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
 
     if (existingSockets) {
       // 이미 등록된 remoteId인 경우, 배열에만 추가
-      existingSockets.push(socket);
+      existingSockets.push(socket);      
     } else {
       // 없으면 새로 배열 생성해서 set
       this.gitClients.set(remoteId, [socket]);
     }
 
+    console.log(data.remote);
+
     this.watcharListener(remoteId, path.resolve(data.remote.path));
+    this.notifyAll(data.remote, "접속", "commit");
     socket.emit('connect_git_response', { success: true, message: `Git Manager connet successful` });
   }
 
@@ -470,7 +478,7 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
     @MessageBody() { remote, remoteBranch }: { remote: Remote; remoteBranch: string },
     @ConnectedSocket() socket: Socket
   ) {
-    try {
+    try {      
       if (!remote) {
         socket.emit('fetch_commit_count_response', { count: 0, message: 'No remote repository specified' });
         return;
@@ -496,6 +504,7 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
 
 
       const targetRef = tempRemote !== '' ? tempRemote : remoteBranch;
+      
 
       if (targetRef === '') {
         socket.emit('fetch_commit_count_response', {
@@ -503,6 +512,9 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
         });
         return;
       }
+      await execFileAsync("git", ["-C", remote.path, "fetch", "--all"])
+
+
       // Git 명령어 실행
       const { stdout, stderr } = await execFileAsync("git", [
         "-C", remote.path,
@@ -1227,12 +1239,11 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
    * @description 깃 리셋
    */
   @SubscribeMessage('git_reset')
-  handleGitReset(
-    @MessageBody() data: { remote: Remote; option: 'soft' | 'mixed' | 'hard', commits: string[] },
+  async handleGitReset(
+    @MessageBody() data: { remote: Remote; option: 'soft' | 'mixed' | 'hard', commits: string[], remoteBranch: string },
     @ConnectedSocket() client: Socket,
   ) {
-    const { remote, option, commits } = data;
-    console.log(data);
+    const { remote, option, commits, remoteBranch } = data;    
 
     // commits가 string 배열일 수도 있고, string일 수도 있음
     let targetCommit = Array.isArray(commits)
@@ -1244,15 +1255,20 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
       return;
     }
 
-    const cmd = `git reset --${option} ${targetCommit}`;
+    const {stdout} = await execFileAsync(
+      'git', ['-C', remote.path, 'rev-parse', `${targetCommit}^`]
+    )
+
+    // 2. parent로 reset
+    const cmd = `git reset --${option} ${stdout}`;
     exec(cmd, { cwd: remote.path }, (err, stdout, stderr) => {
+      console.log(stderr);
       if (err) {
         client.emit('git_reset_response', { success: false, message: stderr });
       } else {
-        client.emit('git_reset_response', { success: true, message: stdout });
+        client.emit('git_reset_response', { success: true, message: stdout, remoteBranch: remoteBranch });
       }
     });
-
   }
 
 

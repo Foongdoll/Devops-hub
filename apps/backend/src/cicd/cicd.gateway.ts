@@ -12,9 +12,10 @@ import {
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
 import { JwtTokenService } from 'src/auth/jwt.service';
+import { TerminalService } from 'src/terminal/terminal.service';
 
 @WebSocketGateway({
-    namespace: 'cicd',    
+    namespace: 'cicd',
     cors: { origin: '*' },
 })
 @Injectable()
@@ -25,7 +26,10 @@ export class CicdGateway
 
     constructor(
         @Inject(JwtTokenService)
-        private readonly jwtService: JwtTokenService) { }
+        private readonly jwtService: JwtTokenService,
+        @Inject(TerminalService)
+        private readonly terminalService: TerminalService
+    ) { }
 
     afterInit(server: Server) {
         server.use(async (socket, next) => {
@@ -52,49 +56,19 @@ export class CicdGateway
 
 
     /**
-     * @param giturl
-     * @dscription 깃 레퍼지토리의 브랜치 목록 불러오기
-     */
-    /**
-  * 깃 레퍼지토리 URL을 받아서 원격 브랜치 목록을 조회해 클라이언트로 반환
-  */
-    @SubscribeMessage('fetch_remote_branches')
-    async handleFetchRemoteBranches(
-        @MessageBody() payload: { giturl: string },
-        @ConnectedSocket() client: Socket,
+     * @param x
+     * @description 
+     * 세션 정보 불러오기
+     * */
+    @SubscribeMessage("onInitSessions")
+    async onInitSessions(
+        @ConnectedSocket() sock: Socket
     ) {
-        this.logger.log(`fetch_remote_branches: ${payload.giturl}`);
+        const result = await this.terminalService.findAll(sock.data.user);        
 
-        try {
-            // 예시: child_process 로 git ls-remote 실행
-            const { exec } = await import('child_process');
-            exec(
-                `git ls-remote --heads ${payload.giturl}`,
-                (err, stdout, stderr) => {
-                    if (err) {
-                        client.emit('fetch_remote_branches_response', {
-                            success: false,
-                            error: stderr || err.message,
-                        });
-                        return;
-                    }
-                    const branches = stdout
-                        .split('\n')
-                        .filter((l) => l)
-                        .map((l) => l.split('\t')[1].replace('refs/heads/', ''));
-                        
-                    client.emit('fetch_remote_branches_response', {
-                        success: true,
-                        branches,
-                    });
-                },
-            );
-        } catch (e) {
-            client.emit('fetch_remote_branches_response', {
-                success: false,
-                error: e.message,
-            });
-        }
+        sock.emit("onInitSessions_Response", {success: true, message: "저장되어있는 세션 목록을 불러왔습니다.", data: result.data});
     }
+
+
 
 }
