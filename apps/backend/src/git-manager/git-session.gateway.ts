@@ -8,6 +8,7 @@ import {
   ConnectedSocket,
   OnGatewayInit,
 } from '@nestjs/websockets';
+import chokidar from "chokidar";
 import { Server, Socket } from 'socket.io';
 import { Inject, Logger, UseGuards } from '@nestjs/common';
 import { promisify } from 'util';
@@ -80,6 +81,29 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
     });
   }
 
+
+  private watcharListener = (remoteId: string, folderPath: string) => {
+
+    const watcher = chokidar.watch(folderPath, {
+      persistent: true,
+      ignoreInitial: true,
+    });
+
+
+    watcher
+      .on('add', (filePath) => this.handleChange(remoteId, 'File added', filePath))
+      .on('change', (filePath) => this.handleChange(remoteId, 'File changed', filePath))
+      .on('unlink', (filePath) => this.handleChange(remoteId, 'File deleted', filePath));
+  }
+
+
+  private handleChange(remoteId: string, eventType: string, filePath: string) {
+    this.io.to(`git_${remoteId}`).emit('file_changed', {
+      filePath,
+      type: eventType,
+    });
+  }
+
   /**
     @param data Remote
     @description
@@ -104,6 +128,7 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
       this.gitClients.set(remoteId, [socket]);
     }
 
+    this.watcharListener(remoteId, path.resolve(data.remote.path));
     socket.emit('connect_git_response', { success: true, message: `Git Manager connet successful` });
   }
 
@@ -279,7 +304,10 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
       socket.emit('fetch_changed_files_response', { resultFiles, discard });
       socket.emit('fetch_stash_changed_files_response', { resultFiles, discard });
     } catch (error) {
-      this.logger.error(`Git diff command failed: ${error.message}`);
+      const msg = error.message as string;
+      if (msg.indexOf("Permission denied") === -1) {
+        this.logger.error(`Git diff command failed: ${error.message}`);
+      }
       socket.emit('fetch_changed_files_response', []);
     }
   }
@@ -1184,7 +1212,7 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
       const { stdout } = await execFileAsync('git', args);
 
       console.log(stdout);
-      this.logger.log('특정 보관함의 선택된 파일의 변경 내역 조회 완료');      
+      this.logger.log('특정 보관함의 선택된 파일의 변경 내역 조회 완료');
       sock.emit('fetch_stash_file_diff_response', { diff: stdout })
     } catch (error) {
       this.logger.error('특정 보관함의 선택된 파일의 변경 내역 조회 실패');
@@ -1192,6 +1220,63 @@ export class GitGateway implements OnGatewayInit, OnGatewayConnection, OnGateway
       sock.emit('fetch_stash_file_diff_response', { diff: "" })
     }
 
+  }
+
+  /**
+   * @param { Remote, option}
+   * @description 깃 리셋
+   */
+  @SubscribeMessage('git_reset')
+  handleGitReset(
+    @MessageBody() data: { remote: Remote; option: 'soft' | 'mixed' | 'hard', commits: string[] },
+    @ConnectedSocket() client: Socket,
+  ) {
+    const { remote, option, commits } = data;
+    console.log(data);
+
+    // commits가 string 배열일 수도 있고, string일 수도 있음
+    let targetCommit = Array.isArray(commits)
+      ? commits[commits.length - 1] // 여러 개면, 가장 마지막 커밋(가장 옛날 해시)
+      : commits; // 단일 커밋
+
+    if (!targetCommit) {
+      client.emit('git_reset_response', { success: false, message: 'No commit selected.' });
+      return;
+    }
+
+    const cmd = `git reset --${option} ${targetCommit}`;
+    exec(cmd, { cwd: remote.path }, (err, stdout, stderr) => {
+      if (err) {
+        client.emit('git_reset_response', { success: false, message: stderr });
+      } else {
+        client.emit('git_reset_response', { success: true, message: stdout });
+      }
+    });
+
+  }
+
+
+  // 예: NestJS 소켓 핸들러
+  @SubscribeMessage('git_unpushed_commits')
+  async handleGetUnpushedCommits(
+    @MessageBody() data: { remote: Remote; branch: string },
+    @ConnectedSocket() client: Socket
+  ) {
+    const { remote, branch } = data;
+    const cmd = `git log ${remote.name}/${branch}..HEAD --oneline`;
+    this.logger.log(cmd);
+    exec(cmd, { cwd: remote.path }, (err, stdout) => {
+      if (err) {
+        client.emit('unpushed_commits_response', []);
+      } else {
+        // ["a1b2c3 message1", "d4e5f6 message2", ...]
+        const commits = stdout.trim().split('\n').map(line => {
+          const [hash, ...messageArr] = line.split(' ');
+          return { hash, message: messageArr.join(' ') };
+        });
+        client.emit('unpushed_commits_response', commits);
+      }
+    });
   }
 
 

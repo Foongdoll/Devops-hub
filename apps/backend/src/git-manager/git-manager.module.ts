@@ -10,4 +10,5 @@ import { AuthModule } from 'src/auth/auth.module';
   controllers: [GitManagerController],
   providers: [GitManagerService],
 })
+
 export class GitManagerModule {}

@@ -18,8 +18,16 @@ export function useTopActionBar() {
     emit('git_pull', { remote, remoteBranch });
   }, [selectedRemote]);
 
-  const fetch = useCallback(() => { /* fetch 로직 */ }, []);
-  const stash = useCallback(() => { /* stash 생성 로직 */ }, []);
+  const fetch = useCallback((remote: Remote | null) => {
+    emit("git_fetch", { remote });
+  }, []);
+  const reset = useCallback((remote: Remote | null, option: string, commits: string[]) => {
+    emit('git_reset', {
+      remote: remote,
+      option, // soft | mixed | hard
+      commits,
+    });
+  }, []);
 
   useEffect(() => {
     const git_push_response = (response: {
@@ -53,19 +61,32 @@ export function useTopActionBar() {
       emit('fetch_pull_request_count', { remote: response.remote, remoteBranch: response.remoteBranch });
     }
 
+    const git_reset_response = (response: {
+      success: boolean,
+      message: string
+    }) => {
+      showToast(response.message, response.success ? "success" : "error");
+      if (response.success) {
+        emit("fetch_changed_files", { remote: selectedRemote });
+        emit("fetch_change_count", { remote: selectedRemote })
+      }
+
+    }
+
+    on('git_reset_response', git_reset_response)
     on('git_push_response', git_push_response);
     on('git_pull_response', git_pull_response);
     on('fetch', fetch);
-    on('stash', stash);
+    on('stash', reset);
 
     return () => {
       off('git_push_response', push);
       off('git_pull_response', pull);
       off('fetch', fetch);
-      off('stash', stash);
+      off('stash', reset);
     };
   }, [selectedRemote]);
 
 
-  return { push, pull, fetch, stash };
+  return { push, pull, fetch, reset };
 }

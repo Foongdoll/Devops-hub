@@ -60,6 +60,7 @@ export function useBranches() {
 
   useEffect(() => {
     on('checkout_local_branch_response', (data: { success: boolean; message: string, branch: string, conflictFiles: File[], remote?: Remote }) => {
+      console.log(data);
       if (data.success) {
         showToast('로컬 브랜치 변경 성공', 'success');
         setSelectedLocalBranch(data.branch);

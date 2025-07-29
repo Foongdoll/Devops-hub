@@ -153,7 +153,6 @@ export function useTerminals({ handleRefresh }: { handleRefresh?: () => void } =
         setIsActiveStatus(prev => [...prev, selectedId]);
         term.write(chunk.replace(/\n/g, '\r\n'));
       }
-
     };
     const onError = (msg: string) => setError(msg);
 

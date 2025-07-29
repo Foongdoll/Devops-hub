@@ -48,9 +48,8 @@ export const useGitManager = () => {
           emit('fetch_commit_count', { remote: data.remote, remoteBranch: '' });
           break;
       }
-
     }
-
+   
     on('connect_git_response', connect_git_response);
     on('git_notify', git_notify)
     return () => {
@@ -73,7 +72,7 @@ export const useGitManager = () => {
 
     on('fetch_change_count_response', (data: { count: number, message?: string }) => {
       if (data.message) {
-        showToast(data.message, 'error');
+        // showToast(data.message, 'error');
         return;
       }
       setChangesCount(data.count);
@@ -96,6 +95,7 @@ export const useGitManager = () => {
       off('fetch_pull_request_count_response');
     }
   }, [tab])
+
 
   return {
     tab, setTab,

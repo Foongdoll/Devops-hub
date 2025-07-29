@@ -9,11 +9,32 @@ import { ConflictModal } from "../components/git/ConflictModal";
 import { useRemoteContext } from "../context/RemoteContext";
 import CommitViewPanel from "../components/git/CommitViewPanel";
 import BranchesPanel from "../components/git/BranchsPanel";
+import { useEffect } from "react";
+import { useGitSocket } from "../context/GitSocketContext";
 
 
 const GitManager = () => {
   const git = useGitManager(); // 커스텀 훅에서 전부 가져오기
   const { conflictModalOpen, setConflictModalOpen, } = useRemoteContext();
+  const { emit, on, off } = useGitSocket();
+  const { selectedRemote } = useRemoteContext();
+  useEffect(() => {
+    // 리모트 폴터 내 파일 변경 리스너 
+    // Changeds에 변경 파일 개수 동기화
+    const fileChanged = (data: { filePath: string, type: string }) => {
+      console.log(selectedRemote);
+      if (data && selectedRemote) {
+        emit("fetch_change_count", { remote: selectedRemote })
+        emit("fetch_changed_files", { remote: selectedRemote })
+      }
+    }
+
+    on('file_changed', fileChanged)
+    return () => {
+      off("file_changed", fileChanged)
+    }
+  }, [])
+  
 
   return (
     <div
@@ -38,7 +59,7 @@ const GitManager = () => {
           onPush={git.push}
           onPull={git.pull}
           onFetch={git.fetch}
-          onStash={git.stash}
+          onReset={git.reset}
           setTab={git.setTab}
         />
       </TabNav>

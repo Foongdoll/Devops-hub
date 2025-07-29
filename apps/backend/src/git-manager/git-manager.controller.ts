@@ -54,11 +54,13 @@ export class GitManagerController {
   }
   
   @Post('applyStash')
+  @ApiOperation({ summary: '스태시 적용', description: '특정 원격 저장소의 특정 스태시를 적용합니다..', parameters: [] })
   async applyStash(@Body() { remote, stashName }: { remote: Remote, stashName: string }): Promise<ApiResponse<void>> {
     return await this.gitManagerService.applyStash(remote, stashName);
   }
   
   @Post('dropStash')
+  @ApiOperation({ summary: '스태시 삭제', description: '특정 원격 저장소의 특정 스태시를 삭제합니다.', parameters: [] })
   async dropStash(@Body() { remote, stashName }: { remote: Remote, stashName: string }): Promise<ApiResponse<void>> {
     return await this.gitManagerService.dropStash(remote, stashName);
   }

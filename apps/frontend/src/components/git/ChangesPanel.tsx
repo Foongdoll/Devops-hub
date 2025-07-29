@@ -94,6 +94,7 @@ const ChangesPanel: React.FC<ChangesPanelProps> = ({
     if (selectedRemote) onStage(selectedRemote, [f]);
   };
 
+
   return (
     <section className="flex flex-col md:flex-row h-[calc(100vh-220px)] gap-6 px-6 py-6">
       {/* Left: Staged/Unstaged */}

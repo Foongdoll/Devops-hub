@@ -115,7 +115,6 @@ export class GitManagerService {
     return ApiResponse.success();
   }
 
-
   /**
     * 브랜치 목록 조회
     * @param remote 원격 저장소 정보

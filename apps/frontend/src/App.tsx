@@ -67,7 +67,6 @@ const App = () => (
           }
         >
           {/* 이 두 개만 이 아래에 둡니다 */}
-
           <Route index element={<Dashboard />} />
           <Route path="terminals" element={<Terminals />} />
           <Route path="git" element={
