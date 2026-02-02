@@ -1,101 +1,78 @@
 # DevOps Hub
 
-SSH, Git, CI/CD 흐름을 한 화면에서 다루는 사이드 프로젝트입니다. 데스크톱(Electron)과 웹 UI(React)를 함께 고려한 DevOps 관리 허브를 목표로 합니다.
+**DevOps Hub**는 SSH 접속, Git 작업, CI/CD 설정 흐름을 **한 화면에서 통합 관리**할 수 있도록 만든 사이드 프로젝트입니다.  
+CLI 기반으로 분산되어 있는 운영 작업을 **데스크톱(Electron) + 웹 UI(React)** 환경에서 동일하게 제공하는 것을 목표로 했습니다.
+
+> 핵심 방향: “명령어 실행”을 넘어, **실시간 입출력/상태 변화/작업 기록**까지 UI에서 확인 가능한 DevOps 작업 허브
+
+---
+
+## 프로젝트 개요
+
+개발/운영 과정에서 SSH 접속(터미널), 파일 전송(SFTP), Git 동기화는 각각 다른 툴과 콘솔 작업으로 분리되어 있고  
+작업 상태를 한눈에 파악하기 어렵습니다.
+
+DevOps Hub는 이 문제를 해결하기 위해 다음 방식으로 설계되었습니다.
+
+- **조회/설정/관리 기능은 REST API**
+- **실시간 실행/입출력은 Socket.IO 이벤트**
+- **터미널/파일/Git 작업을 UI 기반으로 통합**
+
+---
 
 ## 주요 기능
-- SSH 터미널 세션 관리 + 실시간 콘솔(xterm) + SFTP 파일 탐색/업로드/다운로드
-- Git 원격/브랜치/변경사항/커밋/스태시 관리 및 실시간 이벤트(Socket.IO)
-- CI/CD 설정 마법사 UI(리포, 브랜치, 스택, 스크립트 구성) 및 세션 연동
-- JWT 로그인/회원가입/리프레시 토큰, 역할 기반 가드
-- Electron 데스크톱 쉘(커스텀 타이틀바, 창 제어 IPC, 폴더 선택)
 
-## 구성
-```
-apps/
-  backend/    NestJS API + Socket.IO (Auth, Terminal, Git, CICD)
-  frontend/   React/Vite UI + Electron 패키징 스크립트
-  electron/   Electron main/preload (개발용 데스크톱 쉘)
-  docs/       Next.js 문서 앱
-packages/
-  ui/                 공유 UI 컴포넌트
-  eslint-config/      ESLint 설정
-  typescript-config/  TS 설정
-infra/
-  db/docker-compose.yml  MySQL + Redis
-```
+### 1) SSH 터미널 + 실시간 콘솔
+- 터미널 세션 관리(생성/종료)
+- xterm 기반 **실시간 콘솔 입출력**
+- UI에서 작업 결과 확인 및 명령 입력
 
-## 기술 스택
-- Backend: NestJS, TypeORM, MySQL, Redis, Socket.IO, ssh2, swagger
-- Frontend: React 19, Vite, Tailwind CSS, Framer Motion, xterm, socket.io-client
-- Desktop: Electron
-- Tooling: Turborepo, TypeScript, ESLint, Prettier
+### 2) SFTP 원격 파일 관리
+- 원격 디렉터리 탐색 및 파일 목록 조회
+- 파일 업로드/다운로드 지원
+- ZIP 묶음 다운로드로 여러 파일을 한번에 내려받기
 
-## 빠른 시작
-### 1) 의존성 설치
-```bash
-npm install
-```
+### 3) Git 작업 UI화 + 실시간 이벤트 처리
+- 원격(Remote) CRUD 및 설정 관리
+- 브랜치/스태시/변경사항 조회
+- commit / pull / push / reset / tag / checkout 등 실행 기능 제공
+- 실행 결과를 Socket.IO 이벤트 기반으로 받아 **즉시 UI에 반영**
 
-### 2) DB/캐시 기동 (선택)
-```bash
-cd infra/db
-docker compose up -d
-```
+### 4) CI/CD 구성 마법사 (초기 단계)
+- 리포지토리/브랜치/스택/스크립트 형태로 설정 흐름을 UI로 구성
+- 향후 “세션 기반 실행 + 로그 스트리밍” 방식으로 확장할 수 있는 구조로 설계
 
-### 3) 환경 변수 설정
-`apps/backend/.env` 파일을 로컬 환경에 맞게 수정합니다.
+### 5) 인증/보안 기반 사용자 흐름
+- 회원가입/로그인 기반 접근 제어
+- JWT Access/Refresh 기반 인증
+- Refresh Token DB 저장으로 만료 시 재발급 흐름 안정화
+- 역할 기반 가드 적용 가능 구조
 
-필요한 항목:
-- `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, `DB_DATABASE`
-- `JWT_SECRET`, `JWT_REFRESH_SECRET`
-- `CORS_ORIGIN`
-- `SWAGGER_TITLE`, `SWAGGER_DESCRIPTION`, `SWAGGER_VERSION`
+### 6) Electron 데스크톱 쉘
+- 커스텀 타이틀바 기반 창 제어
+- IPC 기반 네이티브 연동(창 제어, 폴더 선택 등)
+- 웹 UI를 데스크톱 앱처럼 사용할 수 있도록 패키징 구조 구성
 
-### 4) 서버 실행
-```bash
-cd apps/backend
-npm run dev
-```
-- 기본 포트: `http://localhost:3000`
-- Swagger: `http://localhost:3000/api-docs`
+---
 
-### 5) 프런트 실행
-```bash
-cd apps/frontend
-npm run dev:react
-```
-- 기본 포트: `http://localhost:5173`
-- 프런트는 기본적으로 `http://localhost:3000` API에 연결됩니다.
+## 기술 설계 포인트
 
-### 6) Electron 실행 (선택)
-```bash
-cd apps/electron
-npm run dev
-```
-- Electron은 `http://localhost:5173`을 로드하므로 프런트를 먼저 실행해야 합니다.
+### REST + WebSocket 역할 분리
+DevOps Hub는 “실시간성이 필요한 작업”이 핵심이기 때문에,  
+단순 REST API만으로는 UX가 끊기는 문제가 발생합니다.
 
-### 7) 문서 앱 실행 (선택)
-```bash
-cd apps/docs
-npm run dev
-```
-- 기본 포트: `http://localhost:3001`
+따라서 다음과 같이 역할을 분리했습니다.
 
-## 주요 엔드포인트
-- REST API: `http://localhost:3000`
-- Swagger: `http://localhost:3000/api-docs`
-- Socket.IO:
-  - Git: `ws://localhost:3000/git`
-  - CI/CD: `http://localhost:3000/cicd`
-  - Terminal: `http://localhost:3000` (기본 네임스페이스)
+- REST: 사용자/설정/조회처럼 **정형화된 요청-응답**
+- WebSocket: SSH 콘솔, Git 실행 등 **입출력 스트리밍 및 상태 이벤트 기반 작업**
 
-## 루트 스크립트
-```bash
-npm run dev    # turbo run dev
-npm run build  # turbo run build
-npm run lint   # turbo run lint
-```
+이를 통해 터미널이나 Git 실행처럼 “진행 상황이 계속 변하는 작업”을  
+UI에서도 자연스럽게 처리할 수 있도록 구성했습니다.
 
-## 상태
-- Git/Terminal은 실사용 흐름이 구현되어 있고, CI/CD는 설정 UI/모델과 소켓 뼈대가 있는 초기 단계입니다.
+---
+
+## 모노레포 구성 (Turborepo)
+
+Backend / Frontend / Electron을 한 레포지토리에서 통합 관리하여  
+공통 설정과 개발 경험을 정리하고, 기능 확장 시 영향 범위를 줄이도록 설계했습니다.
 
